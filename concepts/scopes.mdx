@@ -1,0 +1,110 @@
+---
+title: "Idem API Key Scopes and Least-Privilege Access Control"
+sidebarTitle: "Scopes"
+description: "Idem Ledger API keys carry scopes that limit what each key can do. Learn all available scopes and how to issue least-privilege keys for each integration."
+---
+
+Every API key issued to your tenant carries one or more scopes that define exactly which endpoints and operations that key can perform. Scopes follow the **principle of least privilege** — you should grant each integration only the permissions it genuinely needs. A payment processor that posts transactions has no business reading compliance exports, and an automated agent that executes trades should not be able to create new accounts. Keeping scopes narrow limits the blast radius if a key is ever compromised.
+
+## Scope reference
+
+The table below lists every available scope and the endpoints it unlocks.
+
+| Scope | Endpoints unlocked |
+| --- | --- |
+| `TRANSACTIONS_READ` | List transactions, get transaction by ID, list settlements, get settlement by ID |
+| `TRANSACTIONS_WRITE` | Post transactions, register settlements, cancel settlements |
+| `ACCOUNTS_READ` | List accounts, get account by ID, get balance, list journal entries, get account statement |
+| `ACCOUNTS_WRITE` | Create accounts |
+| `AGENTS_EXECUTE` | Execute agent-originated transactions |
+| `AGENTS_ROLLBACK` | Roll back agent transactions |
+| `AGENTS_AUDIT_READ` | Read agent audit records |
+| `RECONCILIATION_READ` | Read reconciliation results and status |
+| `RECONCILIATION_WRITE` | Trigger batch reconciliation runs |
+| `COMPLIANCE_EXPORT` | Export the full audit log as NDJSON |
+| `WEBHOOK_MANAGE` | Get and update webhook configuration |
+| `ADMIN` | Create, list, and revoke API keys; manage policy rules; supersedes all other scopes |
+
+## Recommended scope sets
+
+Different integration patterns call for different scope combinations. The examples below cover the most common cases.
+
+<CardGroup cols={2}>
+  <Card title="Read-only integration" icon="eye">
+    For dashboards, analytics pipelines, or any consumer that only needs to observe ledger state.
+
+    ```text
+    TRANSACTIONS_READ
+    ACCOUNTS_READ
+    ```
+  </Card>
+
+  <Card title="Payment processor" icon="credit-card">
+    For services that accept payments, post transactions, and manage accounts.
+
+    ```text
+    TRANSACTIONS_WRITE
+    ACCOUNTS_READ
+    ACCOUNTS_WRITE
+    ```
+  </Card>
+
+  <Card title="Compliance team" icon="shield-check">
+    For audit and compliance workflows that need a full export of ledger activity.
+
+    ```text
+    COMPLIANCE_EXPORT
+    ACCOUNTS_READ
+    ```
+  </Card>
+
+  <Card title="Automated agent" icon="robot">
+    For AI agents or automated systems that execute and review transactions on your behalf.
+
+    ```text
+    AGENTS_EXECUTE
+    TRANSACTIONS_READ
+    ACCOUNTS_READ
+    ```
+  </Card>
+</CardGroup>
+
+## Creating a scoped key
+
+Send a `POST` request to `/api/v1/api-keys` with an array of the scopes you want the new key to carry. This endpoint requires the `ADMIN` scope on your calling key.
+
+```json
+POST /api/v1/api-keys
+{
+  "name": "payment-processor-prod",
+  "scopes": [
+    "TRANSACTIONS_WRITE",
+    "ACCOUNTS_READ",
+    "ACCOUNTS_WRITE"
+  ]
+}
+```
+
+**Response — 201 Created**
+
+```json
+{
+  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "name": "payment-processor-prod",
+  "scopes": [
+    "TRANSACTIONS_WRITE",
+    "ACCOUNTS_READ",
+    "ACCOUNTS_WRITE"
+  ],
+  "secret": "sk_live_...",
+  "createdAt": "2024-01-15T10:00:00Z"
+}
+```
+
+<Note>
+  The `secret` field is returned **only once** at creation time. Store it securely in your secrets manager immediately — it cannot be retrieved again. If a key is lost, revoke it and issue a replacement.
+</Note>
+
+<Warning>
+  The `ADMIN` scope supersedes all other scopes: a key carrying `ADMIN` can perform every operation in the API, including issuing and revoking other keys and modifying policy rules. Reserve `ADMIN` keys exclusively for administrative tooling such as key provisioning scripts and infrastructure automation. Never use an `ADMIN`-scoped key in transactional workloads, application servers, or anywhere the key could be exposed to a broader attack surface.
+</Warning>

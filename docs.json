@@ -1,0 +1,118 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "name": "Idem",
+  "theme": "almond",
+  "colors": {
+    "primary": "#ef7025",
+    "light": "#eec9bc",
+    "dark": "#4fa1ab"
+  },
+  "favicon": "/favicon.svg",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "authentication",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/double-entry",
+              "concepts/accounts",
+              "concepts/settlements",
+              "concepts/scopes"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/post-transaction",
+              "guides/settlements",
+              "guides/reconciliation",
+              "guides/compliance",
+              "guides/webhooks",
+              "guides/policy-rules"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Accounts",
+            "pages": [
+              "api-reference/accounts/list-accounts",
+              "api-reference/accounts/create-account",
+              "api-reference/accounts/get-balance",
+              "api-reference/accounts/list-entries",
+              "api-reference/accounts/get-statement"
+            ]
+          },
+          {
+            "group": "Transactions",
+            "pages": [
+              "api-reference/transactions/post-transaction"
+            ]
+          },
+          {
+            "group": "Settlements",
+            "pages": [
+              "api-reference/settlements/list-settlements",
+              "api-reference/settlements/register-settlement",
+              "api-reference/settlements/get-settlement",
+              "api-reference/settlements/cancel-settlement"
+            ]
+          },
+          {
+            "group": "Reconciliation",
+            "pages": [
+              "api-reference/reconciliation/batch-reconcile"
+            ]
+          },
+          {
+            "group": "Compliance",
+            "pages": [
+              "api-reference/compliance/audit-export"
+            ]
+          },
+          {
+            "group": "Administration",
+            "pages": [
+              "api-reference/admin/list-api-keys",
+              "api-reference/admin/create-api-key",
+              "api-reference/admin/revoke-api-key",
+              "api-reference/admin/list-policy-rules",
+              "api-reference/admin/create-policy-rule",
+              "api-reference/admin/delete-policy-rule",
+              "api-reference/admin/get-webhook",
+              "api-reference/admin/update-webhook"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "navbar": {
+    "primary": {
+      "type": "button",
+      "label": "Get API Access",
+      "href": "mailto:hello@idemfinance.com"
+    }
+  },
+  "appearance": {
+    "default": "system",
+    "strict": true
+  },
+  "logo": {
+    "light": "/images/instagram-avatar-1080.png",
+    "dark": "/images/instagram-avatar-1080.png"
+  }
+}

@@ -1,0 +1,56 @@
+---
+title: "Trigger Batch Reconciliation for Unmatched Transactions"
+sidebarTitle: "Reconciliation"
+description: "Learn when and how to use the Idem Ledger batch reconciliation endpoint to re-run matching for transactions that were not reconciled on initial commit."
+---
+
+Reconciliation is the process by which the Idem Ledger matches posted transactions against settlement expectations. Under normal conditions this matching happens automatically at the moment a transaction is committed. However, if a settlement expectation was registered _after_ the transaction was already posted — or if you need to debug why a transaction shows as unmatched — you can manually re-trigger reconciliation for up to 100 transactions at a time using the batch reconciliation endpoint.
+
+## When to reconcile
+
+You should trigger a batch reconciliation run in any of the following scenarios:
+
+- **Late settlement registration** — A transaction was posted before its corresponding settlement expectation existed in the ledger. Re-running reconciliation after registering the expectation will attempt the match retroactively.
+- **Updated expectations** — You corrected or replaced a settlement expectation (for example, with a different amount or wallet address) and want the ledger to re-evaluate existing transactions against the new data.
+- **Debugging unmatched transactions** — A transaction is stuck in an unmatched state and you want to force the matching engine to re-examine it, particularly after resolving an upstream data issue.
+
+## Run batch reconciliation
+
+Send a `POST` request to `/api/v1/reconciliation/batch` with an array of transaction UUIDs. The ledger re-runs the reconciliation logic for each ID in the batch.
+
+```bash
+curl -X POST https://api.your-domain.com/api/v1/reconciliation/batch \
+  -H "Authorization: Bearer $IDEM_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "transactionIds": [
+      "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+    ]
+  }'
+```
+
+The endpoint processes each transaction ID independently. If one transaction fails to reconcile, the others in the batch are still processed — partial success is possible.
+
+## Batch limits
+
+The `transactionIds` array accepts a maximum of **100 UUIDs per request**. If you need to reconcile more than 100 transactions, split them into multiple batches and submit each one separately. There is no built-in rate limit specifically for this endpoint, but standard API rate limits apply.
+
+```json
+{
+  "transactionIds": [
+    "uuid-1",
+    "uuid-2",
+    "...",
+    "uuid-100"
+  ]
+}
+```
+
+## Required scope
+
+Your API key must have the **RECONCILIATION_WRITE** scope to call this endpoint. Requests made with a key that lacks this scope will receive a `403 Forbidden` response. Contact your tenant administrator if you need this scope added to your key.
+
+<Tip>
+  If you regularly register settlement expectations after the fact — for example, because your settlement registration and transaction posting are handled by separate systems — consider triggering a reconciliation batch at the end of each processing window. This ensures all transactions are matched against the most up-to-date expectations without requiring manual intervention for each one individually.
+</Tip>

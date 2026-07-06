@@ -1,0 +1,220 @@
+---
+title: "POST /api/v1/transactions — Post a Balanced Transaction"
+sidebarTitle: "Post Transaction"
+description: "POST /api/v1/transactions — post a balanced double-entry transaction. Requires Idempotency-Key header. Debits must equal credits per currency."
+---
+
+The `/api/v1/transactions` endpoint posts a new double-entry transaction to the ledger. Every transaction must carry at least two journal lines that balance — the sum of all DEBIT amounts must equal the sum of all CREDIT amounts for each currency. A unique `Idempotency-Key` header is required on every request.
+
+## Endpoint
+
+```
+POST /api/v1/transactions
+```
+
+## Authorization
+
+Requires an API key with the `TRANSACTIONS_WRITE` scope. Pass as `Authorization: Bearer <key>`.
+
+## Headers
+
+<ParamField header="Idempotency-Key" type="string" required>
+  A client-generated unique key (max 255 characters) that prevents duplicate transaction posting on retries. If you retry a request with the same key after a successful commit, the original transaction is returned.
+</ParamField>
+
+## Request Body
+
+<ParamField body="lines" type="array" required>
+  Array of journal lines (minimum 2, maximum 1000). Debits must equal credits per currency.
+  <Expandable title="Line object">
+    <ParamField body="accountId" type="string" required>
+      UUID of the account to post this line to.
+    </ParamField>
+    <ParamField body="entryType" type="string" required>
+      `DEBIT` or `CREDIT`.
+    </ParamField>
+    <ParamField body="monetaryEntry" type="object" required>
+      The monetary value. Set `type` to `FIAT` or `ONCHAIN`.
+      <Expandable title="FiatEntryDto fields">
+        <ParamField body="type" type="string" required>Must be `FIAT`.</ParamField>
+        <ParamField body="amount" type="number" required>Transaction amount.</ParamField>
+        <ParamField body="currency" type="string" required>`BRL`, `USD`, `MXN`, or `EUR`.</ParamField>
+        <ParamField body="rail" type="string" required>`ACH`, `WIRE`, `PIX`, `SWIFT`, or `SEPA`.</ParamField>
+        <ParamField body="bankReference" type="string">Optional bank reference number.</ParamField>
+      </Expandable>
+      <Expandable title="OnChainEntryDto fields">
+        <ParamField body="type" type="string" required>Must be `ONCHAIN`.</ParamField>
+        <ParamField body="amount" type="number" required>Transaction amount.</ParamField>
+        <ParamField body="token" type="string" required>`USDC`, `USDT`, `BRZ`, or `PYUSD`.</ParamField>
+        <ParamField body="chainId" type="string" required>`EVM`, `SOLANA`, or `TRON`.</ParamField>
+        <ParamField body="txHash" type="string" required>On-chain transaction hash.</ParamField>
+        <ParamField body="blockNumber" type="integer" required>Block number of the transaction.</ParamField>
+        <ParamField body="walletAddress" type="string" required>Wallet address involved.</ParamField>
+        <ParamField body="tokenContract" type="string" required>Token contract address.</ParamField>
+      </Expandable>
+    </ParamField>
+    <ParamField body="description" type="string">
+      Optional human-readable description for this line.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="metadata" type="object" required>
+  Arbitrary key-value string map attached to the transaction. Use this to store your own reference data (customer IDs, order numbers, etc.).
+</ParamField>
+
+<Note>
+  The `Idempotency-Key` is consumed on a successful `201` response. Retrying with the same key returns the original transaction. A `409` means a transaction with that key is still in progress — wait and retry.
+</Note>
+
+## Request Examples
+
+<Tabs>
+  <Tab title="On-chain entry">
+    ```bash
+    curl -X POST https://api.your-domain.com/api/v1/transactions \
+      -H "Authorization: Bearer $IDEM_API_KEY" \
+      -H "Content-Type: application/json" \
+      -H "Idempotency-Key: txn-onchain-001" \
+      -d '{
+        "lines": [
+          {
+            "accountId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+            "entryType": "DEBIT",
+            "monetaryEntry": {
+              "type": "ONCHAIN",
+              "amount": 100.00,
+              "token": "USDC",
+              "chainId": "EVM",
+              "txHash": "0xabc123def456...",
+              "blockNumber": 19500000,
+              "walletAddress": "0xYourCustodialWallet...",
+              "tokenContract": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+            },
+            "description": "Incoming USDC deposit"
+          },
+          {
+            "accountId": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "entryType": "CREDIT",
+            "monetaryEntry": {
+              "type": "ONCHAIN",
+              "amount": 100.00,
+              "token": "USDC",
+              "chainId": "EVM",
+              "txHash": "0xabc123def456...",
+              "blockNumber": 19500000,
+              "walletAddress": "0xYourCustodialWallet...",
+              "tokenContract": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+            },
+            "description": "Customer deposit credit"
+          }
+        ],
+        "metadata": {
+          "customerId": "cust_abc",
+          "orderId": "ord_12345"
+        }
+      }'
+    ```
+  </Tab>
+  <Tab title="Fiat entry">
+    ```bash
+    curl -X POST https://api.your-domain.com/api/v1/transactions \
+      -H "Authorization: Bearer $IDEM_API_KEY" \
+      -H "Content-Type: application/json" \
+      -H "Idempotency-Key: txn-fiat-002" \
+      -d '{
+        "lines": [
+          {
+            "accountId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+            "entryType": "DEBIT",
+            "monetaryEntry": {
+              "type": "FIAT",
+              "amount": 500.00,
+              "currency": "USD",
+              "rail": "ACH",
+              "bankReference": "ACH-REF-99123"
+            },
+            "description": "ACH wire in"
+          },
+          {
+            "accountId": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "entryType": "CREDIT",
+            "monetaryEntry": {
+              "type": "FIAT",
+              "amount": 500.00,
+              "currency": "USD",
+              "rail": "ACH",
+              "bankReference": "ACH-REF-99123"
+            },
+            "description": "Customer USD deposit"
+          }
+        ],
+        "metadata": {
+          "customerId": "cust_xyz",
+          "source": "bank_transfer"
+        }
+      }'
+    ```
+  </Tab>
+</Tabs>
+
+## Response
+
+<ResponseField name="id" type="string">
+  UUID of the committed transaction.
+</ResponseField>
+
+<ResponseField name="lines" type="array">
+  The posted journal lines with their assigned IDs.
+</ResponseField>
+
+<ResponseField name="metadata" type="object">
+  The metadata map attached to the transaction.
+</ResponseField>
+
+<ResponseField name="createdAt" type="string">
+  ISO-8601 timestamp of when the transaction was committed.
+</ResponseField>
+
+## Response Example
+
+```json
+{
+  "id": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+  "lines": [
+    {
+      "id": "1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed",
+      "accountId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "entryType": "DEBIT",
+      "amount": 100.00,
+      "currency": "USD"
+    },
+    {
+      "id": "2b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed",
+      "accountId": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "entryType": "CREDIT",
+      "amount": 100.00,
+      "currency": "USD"
+    }
+  ],
+  "metadata": {
+    "customerId": "cust_abc",
+    "orderId": "ord_12345"
+  },
+  "createdAt": "2024-01-15T10:30:00Z"
+}
+```
+
+## Error Codes
+
+<Warning>
+  A `422` error has two possible causes: (1) **Unbalanced transaction** — the total DEBIT amount does not equal the total CREDIT amount for a given currency. Check that each currency's debits and credits sum to the same value. (2) **Account not found** — one or more `accountId` values in your `lines` array do not correspond to an account in your tenant. Verify all account IDs before retrying.
+</Warning>
+
+| Code | Meaning |
+|------|------------------------------------------------------|
+| 400  | Missing or invalid `Idempotency-Key`, or malformed request body |
+| 401  | Missing or invalid API key |
+| 403  | API key does not have `TRANSACTIONS_WRITE` scope |
+| 409  | A transaction with this `Idempotency-Key` is already in progress |
+| 422  | Account not found, or debits do not equal credits per currency |

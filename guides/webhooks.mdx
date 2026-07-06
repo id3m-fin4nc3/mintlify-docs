@@ -1,0 +1,85 @@
+---
+title: "Configure Webhooks to Receive Real-Time Event Notifications"
+sidebarTitle: "Webhooks"
+description: "Set up a webhook endpoint to receive real-time notifications from the Idem Ledger API. Covers registration, secret verification, and updating your URL."
+---
+
+Webhooks push event notifications from the Idem Ledger directly to your server the moment something happens — a transaction commits, a settlement matches, or an expectation goes unmatched. Rather than polling the API to check for state changes, you configure a single HTTPS endpoint for your tenant and let Idem deliver events to you in real time.
+
+## Register your webhook
+
+Send a `PUT` request to `/api/v1/tenant/webhook` with the URL you want Idem to deliver events to. This endpoint both registers a new webhook and replaces an existing one.
+
+```bash
+curl -X PUT https://api.your-domain.com/api/v1/tenant/webhook \
+  -H "Authorization: Bearer $IDEM_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"webhookUrl": "https://your-app.com/webhooks/idem"}'
+```
+
+The response includes a **webhook secret**. This secret is used to generate HMAC signatures on outgoing requests so you can verify that events genuinely originate from Idem.
+
+```json
+{
+  "webhookUrl": "https://your-app.com/webhooks/idem",
+  "secret": "whsec_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+}
+```
+
+<Warning>
+  The webhook secret is returned **only once** — at the moment of registration or update. Copy it immediately and store it in a secure secrets manager (such as AWS Secrets Manager, HashiCorp Vault, or your platform's equivalent). If you lose the secret, you must update your webhook URL to trigger a new secret issuance; the old secret cannot be retrieved.
+</Warning>
+
+## Retrieve your webhook config
+
+To check which URL is currently registered for your tenant, send a `GET` request to `/api/v1/tenant/webhook`. The secret is masked in this response to protect it from accidental exposure.
+
+```bash
+curl https://api.your-domain.com/api/v1/tenant/webhook \
+  -H "Authorization: Bearer $IDEM_API_KEY"
+```
+
+```json
+{
+  "webhookUrl": "https://your-app.com/webhooks/idem",
+  "secret": "whsec_***"
+}
+```
+
+If no webhook has been configured for your tenant yet, the API returns `404 Not Found`. Use the `PUT` endpoint described above to register one.
+
+## Verifying webhook signatures
+
+Every request Idem sends to your endpoint includes an HMAC signature header. You must verify this signature before processing the event payload — it confirms the request came from Idem and has not been tampered with in transit.
+
+The general verification flow is:
+
+1. Extract the raw request body (as bytes, before any JSON parsing).
+2. Extract the signature value from the request header.
+3. Compute an HMAC-SHA256 digest of the raw body using your stored webhook secret as the key.
+4. Compare your computed digest against the signature header value using a constant-time comparison.
+5. Reject any request where the signatures do not match.
+
+```bash
+# Example: compute expected signature with OpenSSL
+echo -n "$RAW_BODY" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET"
+```
+
+Reject and do not process any webhook delivery where signature verification fails.
+
+## Update your webhook URL
+
+If you need to rotate your endpoint — for example, after a domain migration or a security rotation — simply `PUT` to `/api/v1/tenant/webhook` again with the new URL:
+
+```bash
+curl -X PUT https://api.your-domain.com/api/v1/tenant/webhook \
+  -H "Authorization: Bearer $IDEM_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"webhookUrl": "https://your-new-app.com/webhooks/idem"}'
+```
+
+Updating the URL issues a **new secret**. Store the new secret immediately and update your application configuration before the old endpoint stops accepting traffic. Events will be delivered to the new URL as soon as the update is confirmed.
+
+## Required scope
+
+Your API key must have the **WEBHOOK_MANAGE** scope to call either the `GET` or `PUT` endpoints. Only privileged administrative keys should hold this scope to limit who can redirect event delivery.

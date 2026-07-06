@@ -1,0 +1,59 @@
+---
+title: "Idem Ledger API: Double-Entry Ledger for Stablecoin Payments"
+sidebarTitle: "Home"
+description: "The Idem Ledger API lets you post double-entry transactions, track stablecoin settlements on-chain, and export compliance-grade audit logs — all through a single REST API."
+---
+
+The Idem Ledger API is a financial-grade double-entry bookkeeping system built for stablecoin payments. Every transaction is balanced across journal lines (debits equal credits), on-chain settlement events are matched automatically, and every action is captured in a tamper-evident audit log you can export at any time.
+
+<CardGroup cols={2}>
+  <Card title="Introduction" icon="book-open" href="/introduction">
+    Learn what the Idem Ledger API is and how it fits your payment stack.
+  </Card>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Make your first authenticated API call in minutes.
+  </Card>
+  <Card title="Authentication" icon="key" href="/authentication">
+    Create API keys and understand scopes and authorization.
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/accounts/list-accounts">
+    Full reference for every endpoint, parameter, and response.
+  </Card>
+</CardGroup>
+
+## Key capabilities
+
+<CardGroup cols={3}>
+  <Card title="Double-Entry Ledger" icon="scale-balanced" href="/concepts/double-entry">
+    Every transaction enforces debit/credit balance per currency.
+  </Card>
+  <Card title="Stablecoin Settlements" icon="link" href="/concepts/settlements">
+    Watch for on-chain transfers and auto-match against expectations.
+  </Card>
+  <Card title="Compliance Exports" icon="file-export" href="/guides/compliance">
+    Stream NDJSON audit logs for any time window.
+  </Card>
+  <Card title="Fine-Grained Scopes" icon="shield-halved" href="/concepts/scopes">
+    Issue API keys with only the permissions each integration needs.
+  </Card>
+  <Card title="Webhooks" icon="webhook" href="/guides/webhooks">
+    Receive real-time event notifications to your endpoint.
+  </Card>
+  <Card title="Agent Policy Rules" icon="robot" href="/guides/policy-rules">
+    Control what automated agents are permitted to do.
+  </Card>
+</CardGroup>
+
+## Get started in three steps
+
+<Steps>
+  <Step title="Get your API key">
+    Contact Idem to provision your tenant and receive an admin API key. See [Authentication](/authentication) for details.
+  </Step>
+  <Step title="Create accounts">
+    Set up your chart of accounts — assets, liabilities, revenues, and expenses. See [Accounts](/concepts/accounts).
+  </Step>
+  <Step title="Post your first transaction">
+    Post a balanced double-entry transaction and verify the journal entries. See the [Quickstart](/quickstart).
+  </Step>
+</Steps>

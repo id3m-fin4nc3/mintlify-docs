@@ -1,0 +1,127 @@
+---
+title: "Idem: Open-Source Double-Entry Ledger for Cross-Border Stablecoin Payments"
+sidebarTitle: "Introduction"
+description: "Idem is an open-source, event-sourced double-entry ledger for cross-border stablecoin payment institutions. Fiat and on-chain entries in one model, with a first-class agentic execution layer."
+---
+
+Idem is an **open-source, event-sourced double-entry ledger** purpose-built for cross-border stablecoin payment institutions. Fiat rails and on-chain transfers live in one unified model, and every transaction posts balanced journal lines so your books, compliance exports, and reconciliations stay in lockstep. A first-class **agentic execution layer** — reachable over REST or MCP — lets automated agents post transactions, reconcile batches, and roll back workflows under policy-guarded, HMAC-signed audit trails.
+
+Idem is delivered as an **open core** (FSL-1.1-ALv2), a managed cloud SaaS, and an enterprise self-hosted distribution — pick the deployment model that fits your compliance posture.
+
+## What you can do
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Post your first balanced transaction in under 10 minutes. Create accounts, build journal lines, and confirm your balance.
+  </Card>
+
+  <Card title="Authentication" icon="key" href="/authentication">
+    Create scoped API keys, apply least-privilege, and secure your credentials.
+  </Card>
+
+  <Card title="Post a Transaction" icon="arrow-right-arrow-left" href="/api-reference/transactions/post-transaction">
+    Explore the full transaction schema, idempotency behavior, and settlement linking.
+  </Card>
+
+  <Card title="Double-Entry Concepts" icon="book-open" href="/concepts/double-entry">
+    Understand debits, credits, chart of accounts, and how Idem enforces balance.
+  </Card>
+</CardGroup>
+
+## How it works
+
+Idem is organized around five core concepts that map directly to standard accounting practice — plus the primitives that make it safe to expose the ledger to automated agents.
+
+**Tenants and accounts.** Your organization is a tenant, isolated by PostgreSQL row-level security. Within your tenant you create accounts — each one typed (`ASSET`, `LIABILITY`, `EQUITY`, `REVENUE`, `EXPENSE`) and denominated in a single currency. Accounts accumulate a running balance from every journal line posted against them.
+
+**Balanced transactions.** Every transaction is a set of journal lines where the sum of all debits equals the sum of all credits for each currency in the transaction. Idem rejects any request that does not balance. This constraint is enforced at the API layer, so bad data never reaches your ledger.
+
+**Unified fiat \+ on-chain entries.** Every journal line carries a `MonetaryEntry`, which is either a `FiatEntry` (with `currency`, `rail`, optional `bankReference`) or an `OnChainEntry` (with `token`, `chainId`, `txHash`, `blockNumber`, `walletAddress`, `tokenContract`). A single transaction can span both — for example, debiting a fiat receivable and crediting an on-chain USDC transfer within the same balanced entry.
+
+**Settlement tracking and reconciliation.** Settlements watch for on-chain stablecoin transfers on EVM, Solana, and Tron and automatically match them to your ledger. Detection is primarily webhook-driven (Alchemy for EVM, QuickNode Streams for Solana, scheduled polling for Tron), with startup recovery from an on-chain checkpoint so no transfer is missed.
+
+**Agent policy and audit.** Agents authenticate with `AGENTS_EXECUTE`-scoped keys and are gated by **PolicyGuard** — a stateless evaluator that enforces per-tenant policy rules (amount, token, chain, account, key prefix) before any write. Every agent action is written to an HMAC-signed, append-only audit log **before** execution, so you always have a tamper-evident record of what the agent tried to do.
+
+## Supported chains, tokens, and rails
+
+Idem tracks value in both fiat and stablecoin denominations. The ledger stores amounts in the currency you specify on each account; it does not perform currency conversion.
+
+### Fiat
+
+| Currency | Rails supported |
+| --- | --- |
+| USD | ACH, WIRE |
+| BRL | PIX |
+| MXN | WIRE |
+| EUR | SWIFT, SEPA |
+
+### Stablecoins
+
+| Token | Networks |
+| --- | --- |
+| USDC | EVM, SOLANA, TRON |
+| USDT | EVM, SOLANA, TRON |
+| BRZ | EVM |
+| PYUSD | EVM, SOLANA |
+
+<Tip>
+  Idem is idempotent by design. Include a unique `Idempotency-Key` header on every `POST /api/v1/transactions` request and the API will safely replay the same response if the request is retried, with no risk of duplicate entries.
+</Tip>
+
+<Note>
+  On-chain monetary entries require you to supply the `txHash`, `blockNumber`, `walletAddress`, `chainId`, and `tokenContract` fields so Idem can verify and reconcile the transfer against the settlement record.
+</Note>
+
+Idem is an **open-source, event-sourced double-entry ledger** purpose-built for cross-border stablecoin payment institutions. Fiat rails and on-chain transfers live in one unified model, and every transaction posts balanced journal lines so your books, compliance exports, and reconciliations stay in lockstep. A first-class **agentic execution layer** — reachable over REST or MCP — lets automated agents post transactions, reconcile batches, and roll back workflows under policy-guarded, HMAC-signed audit trails.
+
+Idem is delivered as an **open core** (FSL-1.1-ALv2), a managed cloud SaaS, and an enterprise self-hosted distribution — pick the deployment model that fits your compliance posture.
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Post your first balanced transaction in under 10 minutes. Create accounts, build journal lines, and confirm your balance.
+  </Card>
+
+  <Card title="Authentication" icon="key" href="/authentication">
+    Create scoped API keys, apply least-privilege, and secure your credentials.
+  </Card>
+
+  <Card title="Post a Transaction" icon="arrow-right-arrow-left" href="/api-reference/transactions/post-transaction">
+    Explore the full transaction schema, idempotency behavior, and settlement linking.
+  </Card>
+
+  <Card title="Double-Entry Concepts" icon="book-open" href="/concepts/double-entry">
+    Understand debits, credits, chart of accounts, and how Idem enforces balance.
+  </Card>
+</CardGroup>
+
+Idem is organized around five core concepts that map directly to standard accounting practice — plus the primitives that make it safe to expose the ledger to automated agents.
+
+**Tenants and accounts.** Your organization is a tenant, isolated by PostgreSQL row-level security. Within your tenant you create accounts — each one typed (`ASSET`, `LIABILITY`, `EQUITY`, `REVENUE`, `EXPENSE`) and denominated in a single currency. Accounts accumulate a running balance from every journal line posted against them.
+
+**Unified fiat \+ on-chain entries.** Every journal line carries a `MonetaryEntry`, which is either a `FiatEntry` (with `currency`, `rail`, optional `bankReference`) or an `OnChainEntry` (with `token`, `chainId`, `txHash`, `blockNumber`, `walletAddress`, `tokenContract`). A single transaction can span both — for example, debiting a fiat receivable and crediting an on-chain USDC transfer within the same balanced entry.
+
+**Settlement tracking and reconciliation.** Settlements watch for on-chain stablecoin transfers on EVM, Solana, and Tron and automatically match them to your ledger. Detection is primarily webhook-driven (Alchemy for EVM, QuickNode Streams for Solana, scheduled polling for Tron), with startup recovery from an on-chain checkpoint so no transfer is missed.
+
+**Agent policy and audit.** Agents authenticate with `AGENTS_EXECUTE`-scoped keys and are gated by **PolicyGuard** — a stateless evaluator that enforces per-tenant policy rules (amount, token, chain, account, key prefix) before any write. Every agent action is written to an HMAC-signed, append-only audit log **before** execution, so you always have a tamper-evident record of what the agent tried to do.
+
+## Supported chains, tokens, and rails
+
+Idem tracks value in both fiat and stablecoin denominations. The ledger stores amounts in the currency you specify on each account; it does not perform currency conversion.
+
+### Fiat
+
+| Currency | Rails supported |
+| --- | --- |
+| USD | ACH, WIRE |
+| BRL | PIX |
+| MXN | WIRE |
+| EUR | SWIFT, SEPA |
+
+### Stablecoins
+
+| Token | Networks |
+| --- | --- |
+| USDC | EVM, SOLANA, TRON |
+| USDT | EVM, SOLANA, TRON |
+| BRZ | EVM |
+| PYUSD | EVM, SOLANA |

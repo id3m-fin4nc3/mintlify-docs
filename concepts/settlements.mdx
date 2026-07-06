@@ -1,0 +1,87 @@
+---
+title: "Settlement Lifecycle: Tracking On-Chain Stablecoin Transfers"
+sidebarTitle: "Settlements"
+description: "Learn how Idem Ledger settlement expectations watch for incoming on-chain stablecoin transfers and automatically match them to your accounts."
+---
+
+A settlement expectation tells Idem to watch a specific wallet address for an incoming stablecoin transfer and automatically reconcile it against your ledger when the transfer is detected on-chain. Instead of polling block explorers and manually posting journal entries, you register an expectation once — Idem monitors the chain, matches the transfer, and records the corresponding entry against the account you specify.
+
+## Settlement lifecycle
+
+Each settlement expectation moves through a defined state machine from creation to a terminal state.
+
+<Steps>
+  <Step title="PENDING">
+    The expectation is registered and active. Idem is watching the target wallet address for a transfer matching your specified token, amount, chain, and optional sender address.
+  </Step>
+  <Step title="SETTLED">
+    A matching on-chain transfer was detected and confirmed. The ledger entry has been recorded against your account. This is a terminal state.
+  </Step>
+  <Step title="UNMATCHED">
+    The watching window elapsed without a qualifying transfer being detected. No ledger entry was created. This is a terminal state — register a new expectation if you still expect the transfer.
+  </Step>
+  <Step title="CANCELLED">
+    The expectation was manually cancelled via `DELETE /api/v1/settlements/{id}` before it reached a terminal state. No ledger entry was created.
+  </Step>
+</Steps>
+
+## Registering a settlement
+
+Send a `POST` request to `/api/v1/settlements` with the account you want credited, the token and amount you expect, and the wallet address to watch.
+
+```json
+POST /api/v1/settlements
+{
+  "accountId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "expectedToken": "USDC",
+  "expectedAmount": "100.00",
+  "expectedWalletAddress": "0xYourWallet...",
+  "expectedChainId": "EVM",
+  "expectedFromAddress": "0xSenderWallet..."
+}
+```
+
+| Field | Required | Description |
+|---|---|---|
+| `accountId` | ✓ | The account to credit when the transfer is matched |
+| `expectedToken` | ✓ | The stablecoin token to watch for |
+| `expectedAmount` | ✓ | The exact amount to match |
+| `expectedWalletAddress` | ✓ | The receiving wallet address on-chain |
+| `expectedChainId` | ✓ | The chain to monitor |
+| `expectedFromAddress` | — | Optional sender address for stricter matching |
+
+Including `expectedFromAddress` enables sender-confirmed matching: Idem will only settle the expectation if the transfer originates from that specific address. Omit it if you want to accept the transfer from any sender.
+
+## Supported tokens and chains
+
+| Token | Supported chains |
+|---|---|
+| `USDC` | `EVM`, `SOLANA`, `TRON` |
+| `USDT` | `EVM`, `SOLANA`, `TRON` |
+| `BRZ` | `EVM` |
+| `PYUSD` | `EVM` |
+
+<Note>
+For EVM chains, `expectedWalletAddress` and `expectedFromAddress` (if provided) must be checksummed or lowercase hexadecimal addresses starting with `0x`. For Solana, provide the base58-encoded public key. For Tron, provide the base58check-encoded address (starts with `T`).
+</Note>
+
+## Cancelling a settlement
+
+You can cancel a `PENDING` settlement before it reaches a terminal state:
+
+```bash
+DELETE /api/v1/settlements/{id}
+```
+
+A successful cancellation returns `200 OK` and transitions the expectation to `CANCELLED`. If the settlement has already reached a terminal state (`SETTLED` or `UNMATCHED`), the API returns `409 Conflict` — terminal expectations cannot be modified.
+
+| Status when DELETE is called | Result |
+|---|---|
+| `PENDING` | Transitions to `CANCELLED`, returns `200 OK` |
+| `SETTLED` | Returns `409 Conflict` |
+| `UNMATCHED` | Returns `409 Conflict` |
+| `CANCELLED` | Returns `409 Conflict` |
+
+<Tip>
+Always supply an `Idempotency-Key` header when registering a settlement expectation. If your request times out or receives a network error, retrying with the same key returns the original expectation instead of creating a duplicate — preventing your account from being credited twice for a single on-chain transfer.
+</Tip>

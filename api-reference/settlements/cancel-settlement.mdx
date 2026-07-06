@@ -1,0 +1,55 @@
+---
+title: "Cancel a Pending Settlement and Stop Transfer Watching"
+sidebarTitle: "Cancel Settlement"
+description: "DELETE /api/v1/settlements/{id} — cancels a PENDING settlement expectation. Returns 409 if already terminal (SETTLED or UNMATCHED). Cannot be undone."
+---
+
+Cancel a settlement expectation that is still in the `PENDING` state. Once cancelled, Idem stops watching for the transfer. Cancellation is permanent and cannot be undone.
+
+## Endpoint
+
+```
+DELETE /api/v1/settlements/{id}
+```
+
+## Authorization
+
+Requires an API key with the `TRANSACTIONS_WRITE` scope.
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The UUID of the settlement to cancel.
+</ParamField>
+
+## Request Example
+
+```bash
+curl -X DELETE "https://api.your-domain.com/api/v1/settlements/3fa85f64-5717-4562-b3fc-2c963f66afa6" \
+  -H "Authorization: Bearer $IDEM_API_KEY"
+```
+
+## Response
+
+Returns `200 OK` with the updated settlement object showing `status: CANCELLED`.
+
+```json
+{
+  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "status": "CANCELLED",
+  "cancelledAt": "2024-01-15T11:00:00Z"
+}
+```
+
+## Error Codes
+
+<Warning>
+  A `409` error means the settlement has already reached a terminal state (`SETTLED` or `UNMATCHED`). Terminal settlements cannot be cancelled.
+</Warning>
+
+| Code | Meaning |
+|------|-----------------------------------------------------------|
+| 401  | Missing or invalid API key |
+| 403  | API key does not have `TRANSACTIONS_WRITE` scope |
+| 404  | Settlement not found for this tenant |
+| 409  | Settlement is already in a terminal status and cannot be cancelled |

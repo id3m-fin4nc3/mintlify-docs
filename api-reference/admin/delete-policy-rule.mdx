@@ -1,0 +1,47 @@
+---
+title: "Delete a Policy Rule and Revoke Agent Authorization"
+sidebarTitle: "Delete Policy Rule"
+description: "DELETE /api/v1/admin/policy-rules/{ruleId} — permanently deletes a policy rule. Agents relying on this rule may have transactions rejected immediately."
+---
+
+Use this endpoint to permanently remove a policy rule from your tenant. Deletion takes effect immediately — any agent transactions that relied on this rule for authorization may be rejected as soon as it is removed. Before deleting a rule, verify that the agents affected by it either no longer need it or are covered by another rule.
+
+## Endpoint
+
+```
+DELETE /api/v1/admin/policy-rules/{ruleId}
+```
+
+## Authorization
+
+Requires an API key with `ADMIN` scope.
+
+<Warning>
+  Deleting a policy rule is **immediate and irreversible**. Agents that were previously authorized by this rule may have their transactions rejected right away. Audit your active agents and their policy dependencies before proceeding. If you need to restore the rule, you must recreate it via [Create Policy Rule](/api-reference/admin/create-policy-rule).
+</Warning>
+
+## Path Parameters
+
+<ParamField path="ruleId" type="string (UUID)" required>
+  The unique identifier of the policy rule to delete. Use [List Policy Rules](/api-reference/admin/list-policy-rules) to look up rule IDs.
+</ParamField>
+
+## Request Example
+
+```bash
+curl --request DELETE \
+  --url https://api.your-domain.com/api/v1/admin/policy-rules/3f5a7c91-12bc-4d8e-a6f0-9b2e1d4c7a88 \
+  --header 'Authorization: Bearer <api-key>'
+```
+
+## Response
+
+A successful deletion returns `204 No Content` with an empty response body.
+
+## Error Codes
+
+| Code | Meaning |
+|---|---|
+| `401` | Missing or invalid API key. |
+| `403` | The provided API key does not have `ADMIN` scope. |
+| `404` | No policy rule found with the given `ruleId` for your tenant. |

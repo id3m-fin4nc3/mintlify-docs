@@ -1,0 +1,95 @@
+---
+title: "Export Tenant Compliance Audit Log as NDJSON Stream"
+sidebarTitle: "Audit Export"
+description: "GET /api/v1/compliance/audit-export — streams audit records as NDJSON. Filter by HUMAN, AGENT, or ALL activity. Both from and to are required."
+---
+
+The audit export endpoint streams every action taken in your tenant as newline-delimited JSON (NDJSON) for a specified time window. Use it to generate compliance reports, feed audit data into your SIEM, or produce records for regulatory requirements.
+
+## Endpoint
+
+```
+GET /api/v1/compliance/audit-export
+```
+
+## Authorization
+
+Requires an API key with the `COMPLIANCE_EXPORT` scope.
+
+## Query Parameters
+
+<ParamField query="from" type="string" required>
+  Inclusive lower bound of the export window. ISO-8601 instant (e.g. `2024-01-01T00:00:00Z`).
+</ParamField>
+
+<ParamField query="to" type="string" required>
+  Exclusive upper bound of the export window. ISO-8601 instant. Must be after `from`.
+</ParamField>
+
+<ParamField query="type" type="string">
+  Filter audit records by actor type. One of: `HUMAN`, `AGENT`, `ALL`. Default: `ALL`.
+</ParamField>
+
+## Request Example
+
+```bash
+# Export all activity for January 2024
+curl "https://api.your-domain.com/api/v1/compliance/audit-export?from=2024-01-01T00:00:00Z&to=2024-02-01T00:00:00Z&type=ALL" \
+  -H "Authorization: Bearer $IDEM_API_KEY"
+
+# Export only agent-originated activity and parse with jq
+curl "https://api.your-domain.com/api/v1/compliance/audit-export?from=2024-01-01T00:00:00Z&to=2024-02-01T00:00:00Z&type=AGENT" \
+  -H "Authorization: Bearer $IDEM_API_KEY" | jq -c '.'
+```
+
+## Response
+
+The response body is an NDJSON stream — each line is a complete JSON object representing one audit record.
+
+```
+{"id":"...","type":"HUMAN","action":"POST_TRANSACTION",...}
+{"id":"...","type":"AGENT","action":"AGENTS_EXECUTE",...}
+```
+
+<ResponseField name="id" type="string">
+  Unique audit record ID.
+</ResponseField>
+
+<ResponseField name="type" type="string">
+  Actor type: `HUMAN` (API key holder) or `AGENT` (automated agent).
+</ResponseField>
+
+<ResponseField name="action" type="string">
+  The action performed (e.g. `POST_TRANSACTION`, `CREATE_ACCOUNT`).
+</ResponseField>
+
+<ResponseField name="actorKeyId" type="string">
+  The ID of the API key that performed the action.
+</ResponseField>
+
+<ResponseField name="occurredAt" type="string">
+  ISO-8601 timestamp of when the action occurred.
+</ResponseField>
+
+<ResponseField name="payload" type="object">
+  Action-specific details (varies by action type).
+</ResponseField>
+
+## Response Example
+
+```
+{"id":"rec_001","type":"HUMAN","action":"POST_TRANSACTION","actorKeyId":"key_abc","occurredAt":"2024-01-15T10:30:00Z","payload":{"transactionId":"9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"}}
+{"id":"rec_002","type":"AGENT","action":"AGENTS_EXECUTE","actorKeyId":"key_agent","occurredAt":"2024-01-15T10:31:00Z","payload":{"transactionId":"3fa85f64-5717-4562-b3fc-2c963f66afa6"}}
+```
+
+<Note>
+  For high-volume tenants, use short time windows (e.g., daily) to avoid very large response streams. Process the NDJSON line-by-line to avoid loading the entire export into memory.
+</Note>
+
+## Error Codes
+
+| Code | Meaning |
+|------|-----------------------------------------------------------|
+| 400  | Missing `from` or `to`, or `from` is after `to` |
+| 401  | Missing or invalid API key |
+| 403  | API key does not have `COMPLIANCE_EXPORT` scope |

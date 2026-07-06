@@ -1,0 +1,47 @@
+---
+title: "Revoke an API Key and Immediately Invalidate Access"
+sidebarTitle: "Revoke API Key"
+description: "DELETE /api/v1/api-keys/{keyId} — immediately revokes an API key. All in-flight requests using the key will begin failing with 401 after revocation."
+---
+
+Use this endpoint to permanently revoke an API key for your tenant. Revocation is immediate — the key is invalidated as soon as the `204` response is returned. Any subsequent requests authenticated with the revoked key will receive a `401` error. This action cannot be undone; if you need to restore access, create a new key with the same scopes.
+
+## Endpoint
+
+```
+DELETE /api/v1/api-keys/{keyId}
+```
+
+## Authorization
+
+Requires an API key with `ADMIN` scope.
+
+<Warning>
+  Revocation takes effect **immediately**. Any services or integrations still using this key will start receiving `401 Unauthorized` errors right away. Ensure you have rotated the key in all dependent systems before revoking the old one.
+</Warning>
+
+## Path Parameters
+
+<ParamField path="keyId" type="string (UUID)" required>
+  The unique identifier of the API key to revoke. Use [List API Keys](/api-reference/admin/list-api-keys) to look up key IDs.
+</ParamField>
+
+## Request Example
+
+```bash
+curl --request DELETE \
+  --url https://api.your-domain.com/api/v1/api-keys/c7d8e9f0-1a2b-3c4d-5e6f-7a8b9c0d1e2f \
+  --header 'Authorization: Bearer <api-key>'
+```
+
+## Response
+
+A successful revocation returns `204 No Content` with an empty response body.
+
+## Error Codes
+
+| Code | Meaning |
+|---|---|
+| `401` | Missing or invalid API key. |
+| `403` | The provided API key does not have `ADMIN` scope. |
+| `404` | No API key found with the given `keyId` for your tenant. |

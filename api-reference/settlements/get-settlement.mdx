@@ -1,0 +1,92 @@
+---
+title: "Retrieve Settlement Details and Current Status by ID"
+sidebarTitle: "Get Settlement"
+description: "GET /api/v1/settlements/{id} — retrieves a single settlement by UUID. Returns current status (PENDING/SETTLED/UNMATCHED/CANCELLED) and matching details."
+---
+
+Retrieve the current state of a specific settlement expectation by its UUID. Use this endpoint to check whether a transfer has been matched, or to inspect the settlement details.
+
+## Endpoint
+
+```
+GET /api/v1/settlements/{id}
+```
+
+## Authorization
+
+Requires an API key with the `TRANSACTIONS_READ` scope.
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The UUID of the settlement to retrieve.
+</ParamField>
+
+## Request Example
+
+```bash
+curl "https://api.your-domain.com/api/v1/settlements/3fa85f64-5717-4562-b3fc-2c963f66afa6" \
+  -H "Authorization: Bearer $IDEM_API_KEY"
+```
+
+## Response
+
+<ResponseField name="id" type="string">
+  Settlement UUID.
+</ResponseField>
+
+<ResponseField name="accountId" type="string">
+  UUID of the receiving account.
+</ResponseField>
+
+<ResponseField name="expectedToken" type="string">
+  The stablecoin token being watched for.
+</ResponseField>
+
+<ResponseField name="expectedAmount" type="string">
+  Expected transfer amount.
+</ResponseField>
+
+<ResponseField name="expectedWalletAddress" type="string">
+  Wallet address being monitored.
+</ResponseField>
+
+<ResponseField name="expectedChainId" type="string">
+  Chain being monitored.
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Current status: `PENDING`, `SETTLED`, `UNMATCHED`, or `CANCELLED`.
+</ResponseField>
+
+<ResponseField name="settledAt" type="string">
+  ISO-8601 timestamp of when the settlement was matched. Present only when status is `SETTLED`.
+</ResponseField>
+
+<ResponseField name="createdAt" type="string">
+  ISO-8601 creation timestamp.
+</ResponseField>
+
+## Response Example
+
+```json
+{
+  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "accountId": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+  "expectedToken": "USDC",
+  "expectedAmount": "250.00",
+  "expectedWalletAddress": "0xYourCustodialWallet...",
+  "expectedChainId": "EVM",
+  "status": "SETTLED",
+  "settledAt": "2024-01-15T10:42:00Z",
+  "createdAt": "2024-01-15T09:00:00Z"
+}
+```
+
+## Error Codes
+
+| Code | Meaning |
+|------|-----------------------------------------------------------|
+| 401  | Missing or invalid API key |
+| 403  | API key does not have `TRANSACTIONS_READ` scope |
+| 404  | Settlement not found for this tenant |

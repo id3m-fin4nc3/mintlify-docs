@@ -1,0 +1,72 @@
+---
+title: "List All Agent Policy Rules Configured for Your Tenant"
+sidebarTitle: "List Policy Rules"
+description: "GET /api/v1/admin/policy-rules — returns all policy rules for your tenant. Policy rules control what agent-originated transactions are permitted."
+---
+
+Use this endpoint to retrieve all policy rules currently configured for your tenant. Policy rules define the conditions under which agent-originated transactions are permitted — for example, capping transaction amounts, restricting allowed tokens or chains, or limiting which accounts an agent can debit or credit. Reviewing your active rules regularly helps ensure your agent guardrails remain intentional and up to date.
+
+## Endpoint
+
+```
+GET /api/v1/admin/policy-rules
+```
+
+## Authorization
+
+Requires an API key with `ADMIN` scope.
+
+## Request Example
+
+```bash
+curl --request GET \
+  --url https://api.your-domain.com/api/v1/admin/policy-rules \
+  --header 'Authorization: Bearer <api-key>'
+```
+
+## Response
+
+A successful response returns an array of policy rule objects.
+
+<ResponseField name="id" type="string" required>
+  Unique identifier (UUID) for the policy rule.
+</ResponseField>
+
+<ResponseField name="type" type="string" required>
+  The rule type, which determines how the rule is evaluated (for example, `MAX_AMOUNT`, `ALLOWED_TOKENS`, `ALLOWED_CHAINS`).
+</ResponseField>
+
+<ResponseField name="agentKeyPrefix" type="string">
+  An optional prefix used to scope the rule to a specific agent or group of agents. When present, the rule applies only to API keys whose prefix matches this value.
+</ResponseField>
+
+<ResponseField name="params" type="object" required>
+  A type-specific parameters object containing the rule's configuration values (for example, `amount`, `tokens`, `chains`, `debitAccountId`, `creditAccountId`).
+</ResponseField>
+
+<ResponseField name="createdAt" type="string (datetime)" required>
+  ISO 8601 timestamp of when the rule was created.
+</ResponseField>
+
+## Response Example
+
+```json
+[
+  {
+    "id": "3f5a7c91-12bc-4d8e-a6f0-9b2e1d4c7a88",
+    "type": "MAX_AMOUNT",
+    "agentKeyPrefix": "agent_payments_",
+    "params": {
+      "amount": "5000.00"
+    },
+    "createdAt": "2024-11-20T08:45:00Z"
+  }
+]
+```
+
+## Error Codes
+
+| Code | Meaning |
+|---|---|
+| `401` | Missing or invalid API key. |
+| `403` | The provided API key does not have `ADMIN` scope. |

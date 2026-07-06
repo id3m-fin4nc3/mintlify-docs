@@ -1,0 +1,153 @@
+---
+title: "Post a Double-Entry Transaction with the Idem Ledger API"
+sidebarTitle: "Post a Transaction"
+description: "Step-by-step guide to posting a balanced double-entry transaction using the Idem Ledger API. Covers fiat entries, on-chain entries, metadata, and idempotency."
+---
+
+Every transaction in the Idem Ledger follows the principles of double-entry bookkeeping: every debit must be matched by an equal credit, and the ledger will reject any request where the lines do not balance. This guide walks you through constructing and posting a valid transaction — whether you are recording a fiat rail transfer or settling an on-chain stablecoin movement.
+
+## Prerequisites
+
+Before you post your first transaction, make sure you have the following in place:
+
+- An API key with the **TRANSACTIONS_WRITE** and **ACCOUNTS_READ** scopes granted.
+- At least two accounts already created in the ledger (one to debit, one to credit).
+- The account UUIDs for the accounts you want to use in your transaction lines.
+
+## Post a transaction
+
+Each request to `POST /api/v1/transactions` must include an `Idempotency-Key` header and a body containing at least two journal lines. The lines array accepts between 2 and 1 000 entries per request.
+
+<Tabs>
+  <Tab title="On-chain entry">
+    Use `OnChainEntryDto` when recording a stablecoin transfer that has already occurred or is expected on-chain. Provide the transaction hash, block number, wallet address, and token contract so the ledger can correlate the entry against settlement expectations.
+
+    ```bash
+    curl -X POST https://api.your-domain.com/api/v1/transactions \
+      -H "Authorization: Bearer $IDEM_API_KEY" \
+      -H "Content-Type: application/json" \
+      -H "Idempotency-Key: 018e4c71-1b2a-7000-8f3d-4a9c2d5e6f7b" \
+      -d '{
+        "lines": [
+          {
+            "accountId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+            "entryType": "DEBIT",
+            "monetaryEntry": {
+              "type": "ONCHAIN",
+              "amount": "250.00",
+              "token": "USDC",
+              "chainId": "EVM",
+              "txHash": "0xabc123def456...",
+              "blockNumber": 19000000,
+              "walletAddress": "0xYourWalletAddress",
+              "tokenContract": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+            },
+            "description": "USDC settlement — order #ORD-9921"
+          },
+          {
+            "accountId": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "entryType": "CREDIT",
+            "monetaryEntry": {
+              "type": "ONCHAIN",
+              "amount": "250.00",
+              "token": "USDC",
+              "chainId": "EVM",
+              "txHash": "0xabc123def456...",
+              "blockNumber": 19000000,
+              "walletAddress": "0xRecipientWalletAddress",
+              "tokenContract": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+            },
+            "description": "USDC receipt — order #ORD-9921"
+          }
+        ],
+        "metadata": {
+          "orderId": "ORD-9921",
+          "region": "us-east"
+        }
+      }'
+    ```
+  </Tab>
+  <Tab title="Fiat entry">
+    Use `FiatEntryDto` when recording a traditional payment rail movement such as ACH, WIRE, PIX, SWIFT, or SEPA. Include the `bankReference` field whenever your bank or payment processor provides a reference number — it helps with reconciliation.
+
+    ```bash
+    curl -X POST https://api.your-domain.com/api/v1/transactions \
+      -H "Authorization: Bearer $IDEM_API_KEY" \
+      -H "Content-Type: application/json" \
+      -H "Idempotency-Key: 018e4c71-2c3b-7000-9g4e-5b0d3e6f8c9a" \
+      -d '{
+        "lines": [
+          {
+            "accountId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+            "entryType": "DEBIT",
+            "monetaryEntry": {
+              "type": "FIAT",
+              "amount": "1500.00",
+              "currency": "USD",
+              "rail": "ACH",
+              "bankReference": "ACH20240115-00042"
+            },
+            "description": "ACH debit — invoice #INV-0042"
+          },
+          {
+            "accountId": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+            "entryType": "CREDIT",
+            "monetaryEntry": {
+              "type": "FIAT",
+              "amount": "1500.00",
+              "currency": "USD",
+              "rail": "ACH",
+              "bankReference": "ACH20240115-00042"
+            },
+            "description": "ACH credit — invoice #INV-0042"
+          }
+        ],
+        "metadata": {
+          "invoiceId": "INV-0042",
+          "customerId": "cust_8812"
+        }
+      }'
+    ```
+  </Tab>
+</Tabs>
+
+## Idempotency
+
+Every `POST /api/v1/transactions` request requires an `Idempotency-Key` header containing a unique string of up to 255 characters. The idempotency key protects you against duplicate transactions when a network timeout or server error forces you to retry a request.
+
+The rules are straightforward:
+
+- If your request succeeds and you send the **same key again**, the API returns the original committed transaction without creating a new one.
+- If a request with a given key is **still in progress** when you retry, the API returns `409 Conflict` — back off and retry after a short delay.
+- If your request **fails with a client error** (4xx), the key is not consumed, so you can correct the body and resubmit with the same key.
+
+<Tip>
+  Generate deterministic idempotency keys from your internal identifiers — for example, combine your order ID with a fixed prefix: `txn-ORD-9921`. This way, even if your application restarts before it persists the response, you will always produce the same key and can safely retry without creating a duplicate ledger entry.
+</Tip>
+
+## Transaction metadata
+
+The `metadata` field accepts a flat object of string key-value pairs. Use it to attach your own business context to a transaction — such as an order ID, customer reference, or processing region — without embedding that information in the journal line descriptions.
+
+```json
+{
+  "metadata": {
+    "orderId": "ORD-9921",
+    "customerId": "cust_8812",
+    "region": "us-east",
+    "processingSystem": "payments-v3"
+  }
+}
+```
+
+Metadata is stored alongside the transaction and returned in read responses, but it does not affect ledger logic. Keys and values must both be strings.
+
+## Error reference
+
+| Status | Meaning |
+|--------|---------|
+| `400 Bad Request` | The request body is malformed or a required field is missing. Check the error detail for the specific validation failure. |
+| `401 Unauthorized` | Your API key is missing or invalid. Verify the `Authorization: Bearer` header. |
+| `403 Forbidden` | Your API key lacks the required scope. Ensure TRANSACTIONS_WRITE is granted. |
+| `409 Conflict` | A request with this `Idempotency-Key` is already in progress. Wait briefly and retry, or check whether the original request committed. |
+| `422 Unprocessable Entity` | The transaction lines are unbalanced, or one or more `accountId` values do not exist in the ledger. Verify that debits equal credits and that all account UUIDs are valid. |

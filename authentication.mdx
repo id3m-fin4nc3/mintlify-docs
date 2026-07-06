@@ -1,0 +1,102 @@
+---
+title: "Authenticate with the Idem Ledger API Using API Keys"
+sidebarTitle: "Authentication"
+description: "Learn how to create API keys, assign scopes, and include your key in every Idem Ledger API request. Covers key rotation and scope best practices."
+---
+
+Idem authenticates every request using API keys passed as Bearer tokens in the `Authorization` header. Keys have the format `sk_live_{uuid}` and are stored bcrypt-hashed — the raw value is only ever returned once, at creation time. Each key carries one or more scopes that control exactly what it can do; there are no global, all-access keys by default. Applying the principle of least privilege keeps your ledger safe even if a key is compromised.
+
+## Passing your API key
+
+Include your key in the `Authorization` header of every request.
+
+```bash
+curl -H "Authorization: Bearer sk_live_your_key_here" \
+     https://api.your-domain.com/api/v1/accounts
+```
+
+<Warning>
+  Never expose your API key in client-side code, public repositories, or log output. Treat it with the same care as a private password.
+</Warning>
+
+## Creating API keys
+
+Creating a key requires the `ADMIN` scope. Send a `POST` request to `/api/v1/api-keys` with the list of scopes the new key should carry.
+
+```bash
+curl -X POST https://api.your-domain.com/api/v1/api-keys \
+  -H "Authorization: Bearer sk_live_your_admin_key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scopes": ["TRANSACTIONS_READ", "TRANSACTIONS_WRITE", "ACCOUNTS_READ"]
+  }'
+```
+
+A successful request returns `201 Created` with the key details:
+
+```json
+{
+  "keyId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "rawKey": "sk_live_abc123...",
+  "scopes": ["TRANSACTIONS_READ", "TRANSACTIONS_WRITE", "ACCOUNTS_READ"],
+  "createdAt": "2024-01-15T10:30:00Z"
+}
+```
+
+<Warning>
+  The `rawKey` value is shown **exactly once** — at creation time. Idem does not store it in recoverable form. Copy it to your secrets manager immediately. If you lose it, revoke the key and create a new one.
+</Warning>
+
+## Available scopes
+
+Assign only the scopes a key actually needs. A tightly scoped key limits blast radius if the credential is ever leaked.
+
+| Scope | What it allows |
+| --- | --- |
+| `TRANSACTIONS_READ` | Read transactions and settlements |
+| `TRANSACTIONS_WRITE` | Post transactions, register and cancel settlements |
+| `ACCOUNTS_READ` | Read accounts, balances, entries, and statements |
+| `ACCOUNTS_WRITE` | Create accounts |
+| `AGENTS_EXECUTE` | Execute agent-originated transactions |
+| `AGENTS_ROLLBACK` | Roll back agent transactions |
+| `AGENTS_AUDIT_READ` | Read agent audit records |
+| `RECONCILIATION_READ` | Read reconciliation results |
+| `RECONCILIATION_WRITE` | Trigger batch reconciliation |
+| `COMPLIANCE_EXPORT` | Export audit logs |
+| `WEBHOOK_MANAGE` | Configure your tenant webhook endpoint |
+| `ADMIN` | Full tenant administration and key management |
+
+<Tip>
+  For production service accounts, create one key per service with only the scopes that service needs. For example, a reconciliation job only needs `RECONCILIATION_READ` and `RECONCILIATION_WRITE` — it does not need `TRANSACTIONS_WRITE` or `ADMIN`.
+</Tip>
+
+## Listing your API keys
+
+Listing keys requires the `ADMIN` scope. You can retrieve all active keys for your tenant at any time. The response includes scope assignments and creation timestamps, but never the raw key values.
+
+```bash
+curl https://api.your-domain.com/api/v1/api-keys \
+  -H "Authorization: Bearer sk_live_your_admin_key"
+```
+
+## Revoking a key
+
+To revoke a key, send a `DELETE` request with the `keyId` you want to invalidate. Revoking requires the `ADMIN` scope. A successful revocation returns `204 No Content` — the key stops working immediately, and all subsequent requests using it receive a `401` response.
+
+```bash
+curl -X DELETE https://api.your-domain.com/api/v1/api-keys/3fa85f64-5717-4562-b3fc-2c963f66afa6 \
+  -H "Authorization: Bearer sk_live_your_admin_key"
+```
+
+<Note>
+  Revocation is permanent. If you need the same permissions again, create a new key with the same scopes.
+</Note>
+
+## Error responses
+
+| HTTP status | Meaning | Common cause |
+| --- | --- | --- |
+| `401 Unauthorized` | Missing or invalid API key | The `Authorization` header is absent, malformed, or the key has been revoked |
+| `403 Forbidden` | Valid key, insufficient scope | The key exists but does not carry the scope required by the endpoint |
+
+When you receive a `403`, check the scope table above and ensure the key used for the request includes the required scope. If it does not, create a new key with the correct scopes or ask your admin to update the existing key.

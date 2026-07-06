@@ -1,0 +1,75 @@
+---
+title: "Register or Update Your Tenant Webhook URL and Secret"
+sidebarTitle: "Update Webhook"
+description: "PUT /api/v1/tenant/webhook — registers or updates the webhook URL. A new secret is issued and shown once. Requires WEBHOOK_MANAGE scope."
+---
+
+Use this endpoint to register a webhook URL for your tenant or to replace an existing one. Every time you call this endpoint, Idem generates a new signing secret and associates it with the URL you provide. The raw secret is included in the response exactly once — use it to verify the authenticity of incoming webhook payloads on your server. If you call this endpoint again to update the URL, a new secret is issued and the previous one is immediately invalidated.
+
+## Endpoint
+
+```
+PUT /api/v1/tenant/webhook
+```
+
+## Authorization
+
+Requires an API key with `WEBHOOK_MANAGE` scope.
+
+<Warning>
+  The webhook signing secret is returned **only once** in the response to this request. Store it securely in your application's secret management system immediately. If you lose the secret, you must call this endpoint again to rotate it — all existing payloads signed with the old secret will fail verification from that point forward.
+</Warning>
+
+## Request Body
+
+<ParamField body="webhookUrl" type="string" required>
+  The HTTPS URL that Idem will POST event payloads to. Must be a non-empty, publicly reachable URL. URLs pointing to private IP ranges, localhost, or known disallowed domains will be rejected.
+</ParamField>
+
+## Request Example
+
+```bash
+curl --request PUT \
+  --url https://api.your-domain.com/api/v1/tenant/webhook \
+  --header 'Authorization: Bearer <api-key>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "webhookUrl": "https://example.com/webhooks/idem"
+  }'
+```
+
+## Response
+
+<ResponseField name="webhookUrl" type="string" required>
+  The webhook URL that was registered, as provided in the request.
+</ResponseField>
+
+<ResponseField name="secret" type="string" required>
+  The raw signing secret for this webhook configuration. **Shown only once.** Use this value to validate the `X-Idem-Signature` header on incoming webhook requests.
+</ResponseField>
+
+<ResponseField name="createdAt" type="string (datetime)" required>
+  ISO 8601 timestamp of when the webhook configuration was registered or updated.
+</ResponseField>
+
+## Response Example
+
+```json
+{
+  "webhookUrl": "https://example.com/webhooks/idem",
+  "secret": "whs_T7kQzP4mNvRxYwKjLhBcUeOs9aFgHiTn",
+  "createdAt": "2024-12-01T12:00:00Z"
+}
+```
+
+<Tip>
+  Validate every incoming webhook by computing an HMAC-SHA256 signature over the raw request body using your stored secret and comparing it to the `X-Idem-Signature` header. Reject any request where the signatures do not match.
+</Tip>
+
+## Error Codes
+
+| Code | Meaning |
+|---|---|
+| `400` | The `webhookUrl` is missing, empty, or points to a blocked or invalid destination. |
+| `401` | Missing or invalid API key. |
+| `403` | The provided API key does not have `WEBHOOK_MANAGE` scope. |

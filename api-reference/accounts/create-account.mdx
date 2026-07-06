@@ -1,0 +1,126 @@
+---
+title: "Create a Ledger Account With Currency, Type, and Name"
+sidebarTitle: "Create Account"
+description: "POST /api/v1/accounts — creates a new ledger account for your tenant. Requires ACCOUNTS_WRITE scope. Specify name, currency, and account type."
+---
+
+Use this endpoint to create a new ledger account in your tenant. Every account you create must be assigned a currency and a double-entry accounting type — these are immutable after creation, so choose carefully. Once an account exists, you can post journal entries to it and query its balance or statement at any point in time.
+
+## Endpoint
+
+```
+POST /api/v1/accounts
+```
+
+## Authorization
+
+Requires an API key with the `ACCOUNTS_WRITE` scope. Pass your key in the `Authorization` header using the Bearer scheme.
+
+```
+Authorization: Bearer <api-key>
+```
+
+## Parameters
+
+<ParamField body="name" type="string" required>
+  A human-readable display name for the account. Must be at least one character long. This value is shown in your dashboard and returned in all account-related responses.
+</ParamField>
+
+<ParamField body="description" type="string">
+  An optional free-text description that gives additional context for the account. You can use this to document the account's purpose, owner, or any other relevant metadata.
+</ParamField>
+
+<ParamField body="currency" type="string" required>
+  The ISO 4217 currency code for this account. Accepted values: `BRL`, `USD`, `MXN`, `EUR`. This field is **immutable** after the account is created — all entries posted to this account must use the same currency.
+</ParamField>
+
+<ParamField body="type" type="string" required>
+  The double-entry accounting classification for this account. Accepted values:
+
+  | Value | Description |
+  |-------|-------------|
+  | `ASSET` | Resources owned by the entity (e.g. cash, receivables) |
+  | `LIABILITY` | Obligations owed to third parties (e.g. payables, loans) |
+  | `EQUITY` | Owner's residual interest in the entity |
+  | `REVENUE` | Income earned from operations |
+  | `EXPENSE` | Costs incurred during operations |
+
+  This field is **immutable** after the account is created.
+</ParamField>
+
+## Request example
+
+```bash
+curl --request POST \
+  --url https://api.your-domain.com/api/v1/accounts \
+  --header "Authorization: Bearer <api-key>" \
+  --header "Content-Type: application/json" \
+  --data '{
+    "name": "Operating Cash",
+    "description": "Primary USD cash account for day-to-day operations",
+    "currency": "USD",
+    "type": "ASSET"
+  }'
+```
+
+## Response
+
+A successful request returns HTTP **201 Created** with the full account object in the response body.
+
+<ResponseField name="id" type="string (UUID)" required>
+  The unique identifier assigned to the new account. Store this value — you will use it to post entries and query balance or statement data.
+</ResponseField>
+
+<ResponseField name="name" type="string" required>
+  The display name you provided in the request body.
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  The description you provided, or `null` if omitted.
+</ResponseField>
+
+<ResponseField name="currency" type="string" required>
+  The ISO 4217 currency code you provided.
+</ResponseField>
+
+<ResponseField name="type" type="string" required>
+  The accounting type you provided.
+</ResponseField>
+
+<ResponseField name="createdAt" type="string (ISO 8601)" required>
+  Timestamp at which the account was created (server-assigned).
+</ResponseField>
+
+<ResponseField name="updatedAt" type="string (ISO 8601)" required>
+  Timestamp of the most recent update. Equals `createdAt` immediately after creation.
+</ResponseField>
+
+## Response example
+
+```json
+{
+  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "name": "Operating Cash",
+  "description": "Primary USD cash account for day-to-day operations",
+  "currency": "USD",
+  "type": "ASSET",
+  "createdAt": "2024-06-12T15:30:00Z",
+  "updatedAt": "2024-06-12T15:30:00Z"
+}
+```
+
+<Warning>
+  The `currency` and `type` fields cannot be changed after an account is created. If you need a different currency or type, create a new account and migrate your entries.
+</Warning>
+
+<Tip>
+  Account names do not need to be unique across your tenant, but using a consistent naming convention (e.g. `"Category — Currency"`) makes it easier to identify accounts in lists and reports.
+</Tip>
+
+## Error codes
+
+| Code | Meaning |
+|------|---------|
+| 400  | Invalid request body. Common causes: `name` is empty or blank, `currency` is not one of `BRL`/`USD`/`MXN`/`EUR`, or `type` is not a recognised accounting type. The response body will include a `message` field describing the specific validation failure. |
+| 401  | Missing or invalid API key. |
+| 403  | Your API key does not have the `ACCOUNTS_WRITE` scope. |

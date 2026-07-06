@@ -1,0 +1,71 @@
+---
+title: "Trigger Batch Reconciliation for Multiple Transactions"
+sidebarTitle: "Batch Reconcile"
+description: "POST /api/v1/reconciliation/batch — re-runs reconciliation for up to 100 transaction IDs. Useful for transactions not matched on initial commit."
+---
+
+The batch reconciliation endpoint re-runs the reconciliation process for a list of transaction IDs. Use it when transactions were posted before their matching settlement expectations were registered, or after you've updated settlement expectations you want matched retroactively.
+
+## Endpoint
+
+```
+POST /api/v1/reconciliation/batch
+```
+
+## Authorization
+
+Requires an API key with the `RECONCILIATION_WRITE` scope.
+
+## Request Body
+
+<ParamField body="transactionIds" type="array" required>
+  Array of transaction UUIDs to re-reconcile. Accepts 0 to 100 IDs per request. An empty array (`[]`) is valid and returns an empty results list.
+</ParamField>
+
+## Request Example
+
+```bash
+curl -X POST https://api.your-domain.com/api/v1/reconciliation/batch \
+  -H "Authorization: Bearer $IDEM_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "transactionIds": [
+      "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d"
+    ]
+  }'
+```
+
+## Response
+
+Returns a `200 OK` with reconciliation results for each transaction in the batch.
+
+```json
+{
+  "results": [
+    {
+      "transactionId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "status": "MATCHED",
+      "settlementId": "1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed"
+    },
+    {
+      "transactionId": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "status": "UNMATCHED",
+      "settlementId": null
+    }
+  ]
+}
+```
+
+## Error Codes
+
+<Tip>
+  Process reconciliation in batches at the end of a settlement window rather than per-transaction for best efficiency.
+</Tip>
+
+| Code | Meaning |
+|------|-----------------------------------------------------------|
+| 400  | Empty batch or more than 100 transaction IDs provided |
+| 401  | Missing or invalid API key |
+| 403  | API key does not have `RECONCILIATION_WRITE` scope |

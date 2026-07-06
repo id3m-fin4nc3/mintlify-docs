@@ -1,0 +1,168 @@
+---
+title: "Retrieve All Paginated Journal Entries for an Account"
+sidebarTitle: "List Entries"
+description: "GET /api/v1/accounts/{id}/entries — paginated reverse-chronological journal entries. Filter by date range and paginate with an opaque cursor."
+---
+
+Use this endpoint to retrieve the journal entries posted to a specific ledger account. Results are returned in **reverse chronological order** (most recent first) and are paginated using an opaque cursor. You can narrow the result set to a particular time window using the `from` and `to` query parameters. This endpoint is the primary way to build transaction history views, export feeds, or audit trails for a given account.
+
+## Endpoint
+
+```
+GET /api/v1/accounts/{accountId}/entries
+```
+
+## Authorization
+
+Requires an API key with the `ACCOUNTS_READ` scope. Pass your key in the `Authorization` header using the Bearer scheme.
+
+```
+Authorization: Bearer <api-key>
+```
+
+## Parameters
+
+<ParamField path="accountId" type="string (UUID)" required>
+  The unique identifier of the account whose journal entries you want to list. Must be a valid UUID corresponding to an account in your tenant.
+</ParamField>
+
+<ParamField query="from" type="string (ISO 8601 datetime)">
+  Inclusive lower bound on the entry's `createdAt` timestamp. Only entries created **at or after** this datetime are included. When omitted, no lower bound is applied.
+
+  **Example:** `2024-01-01T00:00:00Z`
+</ParamField>
+
+<ParamField query="to" type="string (ISO 8601 datetime)">
+  Inclusive upper bound on the entry's `createdAt` timestamp. Only entries created **at or before** this datetime are included. When omitted, no upper bound is applied.
+
+  **Example:** `2024-06-30T23:59:59Z`
+</ParamField>
+
+<ParamField query="limit" type="integer">
+  Maximum number of entries to return in a single page. Accepted range: `1`–`200`. Defaults to `50` when omitted.
+</ParamField>
+
+<ParamField query="cursor" type="string">
+  An opaque pagination cursor obtained from the `nextCursor` field of a previous response. Pass this value to retrieve the next page of results. When omitted, the API returns the first page.
+</ParamField>
+
+## Pagination
+
+This endpoint uses **cursor-based pagination**. After fetching a page, check the `nextCursor` field in the response:
+
+- If `nextCursor` is a non-null string, pass it as the `cursor` query parameter in your next request to retrieve the following page.
+- If `nextCursor` is `null`, you have reached the last page and there are no more entries to retrieve.
+
+Cursors are **stable** — they encode the position within the ordered result set at the time of your first request. Adding new entries after your initial call will not cause you to see duplicates or skip entries while paginating.
+
+<Warning>
+  Cursors are opaque and may change format between API versions. Do not attempt to construct or decode them — always use the value verbatim from `nextCursor`.
+</Warning>
+
+## Request examples
+
+**First page, default limit**
+
+```bash
+curl --request GET \
+  --url https://api.your-domain.com/api/v1/accounts/a1b2c3d4-e5f6-7890-abcd-ef1234567890/entries \
+  --header "Authorization: Bearer <api-key>"
+```
+
+**Filtered by date range with a custom limit**
+
+```bash
+curl --request GET \
+  --url "https://api.your-domain.com/api/v1/accounts/a1b2c3d4-e5f6-7890-abcd-ef1234567890/entries?from=2024-01-01T00%3A00%3A00Z&to=2024-06-30T23%3A59%3A59Z&limit=100" \
+  --header "Authorization: Bearer <api-key>"
+```
+
+**Subsequent page using a cursor**
+
+```bash
+curl --request GET \
+  --url "https://api.your-domain.com/api/v1/accounts/a1b2c3d4-e5f6-7890-abcd-ef1234567890/entries?cursor=eyJpZCI6ImFiYzEyMyIsImRpciI6InByZXYifQ" \
+  --header "Authorization: Bearer <api-key>"
+```
+
+## Response
+
+<ResponseField name="items" type="array" required>
+  Ordered array of journal entry objects for this page, in reverse chronological order.
+
+  <Expandable title="entry object">
+    <ResponseField name="id" type="string (UUID)" required>
+      Unique identifier for the journal entry.
+    </ResponseField>
+
+    <ResponseField name="accountId" type="string (UUID)" required>
+      The account this entry was posted to.
+    </ResponseField>
+
+    <ResponseField name="amount" type="number" required>
+      The signed amount of the entry. Positive values represent debits; negative values represent credits (or vice versa, depending on the account type — refer to your double-entry configuration).
+    </ResponseField>
+
+    <ResponseField name="currency" type="string" required>
+      ISO 4217 currency code. Always matches the account's currency.
+    </ResponseField>
+
+    <ResponseField name="description" type="string">
+      Optional human-readable description of this entry, if one was provided when the entry was created.
+    </ResponseField>
+
+    <ResponseField name="transactionId" type="string (UUID)" required>
+      Identifier of the parent transaction that generated this entry. Use this to group related debits and credits together.
+    </ResponseField>
+
+    <ResponseField name="createdAt" type="string (ISO 8601)" required>
+      Timestamp at which the entry was posted to the ledger.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="nextCursor" type="string | null" required>
+  An opaque cursor pointing to the next page of results. Pass this as the `cursor` query parameter in your next request. `null` indicates there are no further pages.
+</ResponseField>
+
+<ResponseField name="total" type="integer" required>
+  Total number of entries matching the query (across all pages). Useful for rendering pagination controls.
+</ResponseField>
+
+## Response example
+
+```json
+{
+  "items": [
+    {
+      "id": "e9f0a1b2-c3d4-5678-90ab-cdef12345678",
+      "accountId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "amount": 500.00,
+      "currency": "USD",
+      "description": "Customer payment — Invoice #1042",
+      "transactionId": "f0a1b2c3-d4e5-6789-abcd-ef0123456789",
+      "createdAt": "2024-06-10T11:22:33Z"
+    },
+    {
+      "id": "d8e9f0a1-b2c3-4567-89ab-cdef01234567",
+      "accountId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "amount": -200.00,
+      "currency": "USD",
+      "description": "Supplier disbursement — PO #88",
+      "transactionId": "e9f0a1b2-c3d4-5678-efab-0123456789cd",
+      "createdAt": "2024-06-08T09:14:00Z"
+    }
+  ],
+  "nextCursor": "eyJpZCI6ImQ4ZTlmMGExIiwiZGlyIjoicHJldiJ9",
+  "total": 143
+}
+```
+
+## Error codes
+
+| Code | Meaning |
+|------|---------|
+| 400  | Invalid request. Common causes: `accountId` is not a valid UUID, `limit` is outside the 1–200 range, `from` is after `to`, or the `cursor` value is malformed or expired. |
+| 401  | Missing or invalid API key. |
+| 403  | Your API key does not have the `ACCOUNTS_READ` scope. |
+| 404  | No account with the given `accountId` exists in your tenant. |

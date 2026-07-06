@@ -1,0 +1,105 @@
+---
+title: "Register a Settlement Expectation for Wallet Watching"
+sidebarTitle: "Register Settlement"
+description: "POST /api/v1/settlements — register a settlement expectation. Idem watches the wallet for an on-chain stablecoin transfer and auto-reconciles on match."
+---
+
+Register a settlement expectation to tell Idem which wallet address to watch for an incoming stablecoin transfer. Once registered with `PENDING` status, Idem monitors the specified chain and automatically reconciles the settlement when the transfer is detected.
+
+## Endpoint
+
+```
+POST /api/v1/settlements
+```
+
+## Authorization
+
+Requires an API key with the `TRANSACTIONS_WRITE` scope.
+
+## Headers
+
+<ParamField header="Idempotency-Key" type="string" required>
+  A client-generated unique key (max 255 characters) that prevents duplicate settlement registration on retries.
+</ParamField>
+
+## Request Body
+
+<ParamField body="accountId" type="string" required>
+  UUID of the account that will receive the on-chain transfer.
+</ParamField>
+
+<ParamField body="expectedToken" type="string" required>
+  The stablecoin token identifier to watch for (e.g. `USDC`, `USDT`). Must be a non-empty string.
+</ParamField>
+
+<ParamField body="expectedAmount" type="string" required>
+  Expected transfer amount as a string (e.g. `"100.00"`).
+</ParamField>
+
+<ParamField body="expectedWalletAddress" type="string" required>
+  The wallet address to watch for the incoming transfer.
+</ParamField>
+
+<ParamField body="expectedChainId" type="string" required>
+  The chain to monitor. One of: `EVM`, `SOLANA`, `TRON`.
+</ParamField>
+
+<ParamField body="expectedFromAddress" type="string">
+  Optional expected sender wallet address. When provided, Idem only matches transfers from this specific address (sender-confirmed matching).
+</ParamField>
+
+## Request Example
+
+```bash
+curl -X POST https://api.your-domain.com/api/v1/settlements \
+  -H "Authorization: Bearer $IDEM_API_KEY" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: stl-expect-001" \
+  -d '{
+    "accountId": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+    "expectedToken": "USDC",
+    "expectedAmount": "250.00",
+    "expectedWalletAddress": "0xYourCustodialWallet...",
+    "expectedChainId": "EVM",
+    "expectedFromAddress": "0xSenderWallet..."
+  }'
+```
+
+## Response
+
+<ResponseField name="id" type="string">
+  UUID of the registered settlement expectation.
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Initial status is always `PENDING`.
+</ResponseField>
+
+<ResponseField name="createdAt" type="string">
+  ISO-8601 creation timestamp.
+</ResponseField>
+
+## Response Example
+
+```json
+{
+  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "accountId": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+  "expectedToken": "USDC",
+  "expectedAmount": "250.00",
+  "expectedWalletAddress": "0xYourCustodialWallet...",
+  "expectedChainId": "EVM",
+  "status": "PENDING",
+  "createdAt": "2024-01-15T09:00:00Z"
+}
+```
+
+## Error Codes
+
+| Code | Meaning |
+|------|-----------------------------------------------------------|
+| 400  | Missing/invalid `Idempotency-Key`, malformed body, or invalid token/chainId |
+| 401  | Missing or invalid API key |
+| 403  | API key does not have `TRANSACTIONS_WRITE` scope |
+| 409  | Duplicate `Idempotency-Key` for an in-progress registration |
+| 422  | Account not found for this tenant |

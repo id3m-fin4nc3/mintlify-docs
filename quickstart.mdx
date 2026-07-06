@@ -1,0 +1,169 @@
+---
+title: "Quickstart: Post Your First Idem Ledger Transaction"
+sidebarTitle: "Quickstart"
+description: "Learn how to authenticate, create accounts, and post your first balanced double-entry transaction with the Idem Ledger API in under 10 minutes."
+---
+
+The Idem Ledger API uses double-entry bookkeeping — every transaction must have at least two journal lines where debits equal credits. This quickstart walks you through getting your API key, creating two accounts, posting a balanced transaction, and verifying the resulting balance.
+
+<Tip>
+  Idem is open source (FSL-1.1-ALv2) and can be self-hosted, run against the managed cloud, or shipped as the enterprise distribution. The examples below use `https://api.your-domain.com` as a placeholder — swap it for your Idem base URL (for example, `http://localhost:8080` if you're running the docker-compose stack locally).
+</Tip>
+
+<Steps>
+  <Step title="Get your API key">
+    Provision (or generate) an admin API key for your tenant. Idem API keys have the format `sk_live_{uuid}` and are shown exactly once. Set it as an environment variable:
+
+    ```bash
+    export IDEM_API_KEY=sk_live_your_key_here
+    export IDEM_API_URL=https://api.your-domain.com
+    ```
+
+    <Note>
+      See [Authentication](/authentication) for details on creating additional scoped keys for different integrations.
+    </Note>
+  </Step>
+  <Step title="Create two accounts">
+    Every transaction needs accounts to post to. Create an ASSET account (representing a wallet you hold) and a LIABILITY account (representing what you owe to customers):
+
+    ```bash
+    # Create an asset account (e.g., stablecoin custodial wallet)
+    curl -X POST https://api.your-domain.com/api/v1/accounts \
+      -H "Authorization: Bearer $IDEM_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "name": "USDC Wallet",
+        "description": "Primary USDC custodial wallet",
+        "currency": "USD",
+        "type": "ASSET"
+      }'
+    ```
+
+    ```bash
+    # Create a liability account (e.g., customer deposits)
+    curl -X POST https://api.your-domain.com/api/v1/accounts \
+      -H "Authorization: Bearer $IDEM_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "name": "Customer Deposits",
+        "description": "Customer deposit liability",
+        "currency": "USD",
+        "type": "LIABILITY"
+      }'
+    ```
+
+    Each response returns an `id` UUID. Save both:
+
+    ```bash
+    export ASSET_ACCOUNT_ID=<id from first response>
+    export LIABILITY_ACCOUNT_ID=<id from second response>
+    ```
+
+    <Tip>
+      Account `currency` and `type` are immutable after creation. Choose carefully.
+    </Tip>
+  </Step>
+  <Step title="Post a balanced transaction">
+    Post a two-line transaction: DEBIT the asset account (value coming in) and CREDIT the liability account (obligation created). The `Idempotency-Key` header prevents duplicate posts on retries.
+
+    ```bash
+    curl -X POST https://api.your-domain.com/api/v1/transactions \
+      -H "Authorization: Bearer $IDEM_API_KEY" \
+      -H "Content-Type: application/json" \
+      -H "Idempotency-Key: txn-quickstart-001" \
+      -d '{
+        "lines": [
+          {
+            "accountId": "'"$ASSET_ACCOUNT_ID"'",
+            "entryType": "DEBIT",
+            "monetaryEntry": {
+              "type": "ONCHAIN",
+              "amount": 100.00,
+              "token": "USDC",
+              "chainId": "EVM",
+              "txHash": "0xabc123def456...",
+              "blockNumber": 19500000,
+              "walletAddress": "0xYourCustodialWallet...",
+              "tokenContract": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+            },
+            "description": "Incoming USDC deposit"
+          },
+          {
+            "accountId": "'"$LIABILITY_ACCOUNT_ID"'",
+            "entryType": "CREDIT",
+            "monetaryEntry": {
+              "type": "ONCHAIN",
+              "amount": 100.00,
+              "token": "USDC",
+              "chainId": "EVM",
+              "txHash": "0xabc123def456...",
+              "blockNumber": 19500000,
+              "walletAddress": "0xYourCustodialWallet...",
+              "tokenContract": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+            },
+            "description": "Customer deposit credit"
+          }
+        ],
+        "metadata": {
+          "customerId": "cust_abc",
+          "source": "quickstart"
+        }
+      }'
+    ```
+
+    A successful `201` response includes the transaction ID and committed lines:
+
+    ```json
+    {
+      "id": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+      "lines": [...],
+      "metadata": { "customerId": "cust_abc", "source": "quickstart" },
+      "createdAt": "2024-01-15T10:30:00Z"
+    }
+    ```
+
+    <Note>
+      If you retry with the same `Idempotency-Key` after a success, you get the original result back — no duplicate is posted.
+    </Note>
+  </Step>
+  <Step title="Verify the balance">
+    Confirm the transaction posted by checking the asset account balance:
+
+    ```bash
+    curl "https://api.your-domain.com/api/v1/accounts/$ASSET_ACCOUNT_ID/balance" \
+      -H "Authorization: Bearer $IDEM_API_KEY"
+    ```
+
+    Expected response:
+
+    ```json
+    {
+      "accountId": "...",
+      "balance": "100.00",
+      "currency": "USD"
+    }
+    ```
+
+    Check the liability account balance too — it should show `100.00` as well, confirming the double-entry invariant holds.
+  </Step>
+</Steps>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Double-Entry Concepts" icon="scale-balanced" href="/concepts/double-entry">
+    Understand the full journal line model, fiat vs. on-chain entries, and the balance invariant.
+  </Card>
+
+  <Card title="Settlements" icon="link" href="/guides/settlements">
+    Register settlement expectations to watch for incoming on-chain transfers.
+  </Card>
+
+  <Card title="Reconciliation" icon="rotate" href="/guides/reconciliation">
+    Re-run matching for transactions that weren't reconciled on initial commit.
+  </Card>
+
+  <Card title="Authentication" icon="key" href="/authentication">
+    Create scoped API keys for different integrations using least-privilege access.
+  </Card>
+</CardGroup>

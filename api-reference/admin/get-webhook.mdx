@@ -1,0 +1,61 @@
+---
+title: "Retrieve the Current Webhook Configuration for Your Tenant"
+sidebarTitle: "Get Webhook"
+description: "GET /api/v1/tenant/webhook — retrieves the current webhook URL for your tenant. The webhook secret is always masked in this response for security."
+---
+
+Use this endpoint to retrieve the webhook configuration currently registered for your tenant. The response includes the configured URL and a masked representation of the signing secret. Because the secret is never returned in plaintext after initial registration, use this endpoint to confirm that a webhook URL is set and to inspect its URL — not to recover the secret. If you need to rotate the secret, update the webhook using the PUT endpoint.
+
+## Endpoint
+
+```
+GET /api/v1/tenant/webhook
+```
+
+## Authorization
+
+Requires an API key with `WEBHOOK_MANAGE` scope.
+
+<Note>
+  The webhook signing secret is **always masked** in this response (for example, `whs_••••••••••••••••`). If you have lost the secret, use [Update Webhook](/api-reference/admin/update-webhook) to register a new URL — a fresh secret will be issued and shown once in that response.
+</Note>
+
+## Request Example
+
+```bash
+curl --request GET \
+  --url https://api.your-domain.com/api/v1/tenant/webhook \
+  --header 'Authorization: Bearer <api-key>'
+```
+
+## Response
+
+<ResponseField name="webhookUrl" type="string" required>
+  The HTTPS URL that Idem will POST event payloads to.
+</ResponseField>
+
+<ResponseField name="secret" type="string" required>
+  A masked representation of the signing secret used to verify webhook payloads. The raw value is never returned by this endpoint.
+</ResponseField>
+
+<ResponseField name="createdAt" type="string (datetime)" required>
+  ISO 8601 timestamp of when the webhook configuration was last registered or updated.
+</ResponseField>
+
+## Response Example
+
+```json
+{
+  "webhookUrl": "https://example.com/webhooks/idem",
+  "secret": "whs_••••••••••••••••",
+  "createdAt": "2024-11-30T16:20:00Z"
+}
+```
+
+## Error Codes
+
+| Code | Meaning |
+|---|---|
+| `401` | Missing or invalid API key. |
+| `403` | The provided API key does not have `WEBHOOK_MANAGE` scope. |
+| `404` | No webhook has been configured for your tenant yet. Use [Update Webhook](/api-reference/admin/update-webhook) to register one. |

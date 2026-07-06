@@ -1,0 +1,139 @@
+---
+title: "Generate an Account Statement for a Custom Date Range"
+sidebarTitle: "Account Statement"
+description: "GET /api/v1/accounts/{id}/statement — period statement with opening balance, movements, and closing balance. Both from and to are required."
+---
+
+Use this endpoint to generate a formal account statement for any date range you choose. The response gives you the account's opening balance at the start of the period, a structured summary of all movements (debits and credits) that occurred within that window, and the resulting closing balance at the end. This is the right endpoint to use when reconciling accounts, producing period-end reports, or exporting data for external accounting systems.
+
+## Endpoint
+
+```
+GET /api/v1/accounts/{accountId}/statement
+```
+
+## Authorization
+
+Requires an API key with the `ACCOUNTS_READ` scope. Pass your key in the `Authorization` header using the Bearer scheme.
+
+```
+Authorization: Bearer <api-key>
+```
+
+## Parameters
+
+<ParamField path="accountId" type="string (UUID)" required>
+  The unique identifier of the account for which you want to generate a statement. Must be a valid UUID corresponding to an account in your tenant.
+</ParamField>
+
+<ParamField query="from" type="string (ISO 8601 datetime)" required>
+  The **inclusive** start of the statement period. Entries with an `occurredAt` on or after this datetime are included in the movements.
+
+  **Example:** `2024-01-01T00:00:00Z`
+</ParamField>
+
+<ParamField query="to" type="string (ISO 8601 datetime)" required>
+  The **inclusive** end of the statement period. Entries with an `occurredAt` on or before this datetime are included in the movements.
+
+  **Example:** `2024-06-30T23:59:59Z`
+</ParamField>
+
+<Note>
+  Both `from` and `to` are **required** for this endpoint. Requests that omit either parameter will receive a `400` error. Additionally, `from` must be earlier than or equal to `to`.
+</Note>
+
+## Request example
+
+```bash
+curl --request GET \
+  --url "https://api.your-domain.com/api/v1/accounts/a1b2c3d4-e5f6-7890-abcd-ef1234567890/statement?from=2024-01-01T00%3A00%3A00Z&to=2024-06-30T23%3A59%3A59Z" \
+  --header "Authorization: Bearer <api-key>"
+```
+
+## Response
+
+<ResponseField name="accountId" type="string (UUID)" required>
+  The unique identifier of the account, echoed back from the request.
+</ResponseField>
+
+<ResponseField name="currency" type="string" required>
+  The ISO 4217 currency code of the account (e.g. `USD`, `BRL`).
+</ResponseField>
+
+<ResponseField name="period" type="object" required>
+  The date range covered by this statement.
+
+  <Expandable title="period object">
+    <ResponseField name="from" type="string (ISO 8601)" required>
+      The inclusive start of the statement period.
+    </ResponseField>
+
+    <ResponseField name="to" type="string (ISO 8601)" required>
+      The inclusive end of the statement period.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="openingBalance" type="number" required>
+  The account balance at the instant immediately **before** the `from` timestamp — i.e. the balance computed from all entries posted prior to the start of the requested period. This is your starting point for reconciliation.
+</ResponseField>
+
+<ResponseField name="movements" type="object" required>
+  A summary of all activity that occurred within the statement period.
+
+  <Expandable title="movements object">
+    <ResponseField name="totalDebits" type="number" required>
+      The sum of all debit entries posted to the account during the period.
+    </ResponseField>
+
+    <ResponseField name="totalCredits" type="number" required>
+      The sum of all credit entries posted to the account during the period.
+    </ResponseField>
+
+    <ResponseField name="netMovement" type="number" required>
+      The net change in balance during the period (`totalDebits - totalCredits`). A positive value indicates a net increase; negative indicates a net decrease.
+    </ResponseField>
+
+    <ResponseField name="entryCount" type="integer" required>
+      The total number of individual journal entries within the period.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="closingBalance" type="number" required>
+  The account balance at the instant immediately **after** the `to` timestamp — computed as `openingBalance + movements.netMovement`. This is your ending balance for the period.
+</ResponseField>
+
+## Response example
+
+```json
+{
+  "accountId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "currency": "USD",
+  "period": {
+    "from": "2024-01-01T00:00:00Z",
+    "to": "2024-06-30T23:59:59Z"
+  },
+  "openingBalance": 5000.00,
+  "movements": {
+    "totalDebits": 32750.00,
+    "totalCredits": 22925.50,
+    "netMovement": 9824.50,
+    "entryCount": 87
+  },
+  "closingBalance": 14824.50
+}
+```
+
+<Tip>
+  To generate a monthly statement for an entire year, you can issue twelve sequential requests — one per calendar month — using the same `accountId`. The `closingBalance` of each month will equal the `openingBalance` of the next, making it easy to verify continuity.
+</Tip>
+
+## Error codes
+
+| Code | Meaning |
+|------|---------|
+| 400  | Invalid request. Common causes: `from` or `to` is missing, `accountId` is not a valid UUID, or `from` is a datetime that falls after `to`. The response body will include a `message` field describing the specific error. |
+| 401  | Missing or invalid API key. |
+| 403  | Your API key does not have the `ACCOUNTS_READ` scope. |
+| 404  | No account with the given `accountId` exists in your tenant. |

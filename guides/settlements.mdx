@@ -1,0 +1,99 @@
+---
+title: "Register and Track On-Chain Settlement Expectations"
+sidebarTitle: "Settlements"
+description: "Learn how to register settlement expectations in Idem Ledger, watch for incoming stablecoin transfers, and handle PENDING, SETTLED, UNMATCHED, and CANCELLED states."
+---
+
+A settlement expectation tells the Idem Ledger what on-chain transfer you are waiting for. When a matching transfer arrives — the right token, amount, and wallet address on the right chain — the ledger automatically links it to the expectation and marks the settlement as `SETTLED`. If no match is found within the settlement window, the record transitions to `UNMATCHED` so you can investigate or take corrective action.
+
+## How settlements work
+
+The settlement lifecycle moves in one direction: you register an expectation, the ledger monitors for a matching on-chain transfer, and the record eventually reaches a terminal state.
+
+<Steps>
+  <Step title="Register an expectation">
+    Call `POST /api/v1/settlements` to describe the transfer you expect to receive — token, amount, chain, and destination wallet. The settlement is created in the `PENDING` state.
+  </Step>
+  <Step title="Wait for the transfer">
+    The Idem Ledger watches for an on-chain transfer that matches your expectation. No polling is required on your part; you can check status on demand or listen for a webhook event.
+  </Step>
+  <Step title="Check settlement status">
+    Call `GET /api/v1/settlements/{id}` at any time to inspect the current status. Filter your full list with `GET /api/v1/settlements?status=PENDING` to see all open expectations.
+  </Step>
+  <Step title="Handle the outcome">
+    A `SETTLED` record means the transfer was matched and the corresponding ledger entries have been committed. An `UNMATCHED` record requires your attention — re-register, investigate the on-chain transfer, or use the batch reconciliation endpoint to re-run matching after updating the expectation.
+  </Step>
+</Steps>
+
+## Register a settlement
+
+Send a `POST` request to `/api/v1/settlements` with an `Idempotency-Key` header. Provide the account that will receive the funds along with the full transfer expectation.
+
+```bash
+curl -X POST https://api.your-domain.com/api/v1/settlements \
+  -H "Authorization: Bearer $IDEM_API_KEY" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: settle-018e4c71-3d4c-7001-af5e-6c1e4f7g9d0b" \
+  -d '{
+    "accountId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "expectedToken": "USDC",
+    "expectedAmount": "500.00",
+    "expectedWalletAddress": "0xYourDestinationWallet",
+    "expectedChainId": "EVM",
+    "expectedFromAddress": "0xSenderWalletAddress"
+  }'
+```
+
+The `expectedFromAddress` field is optional. When provided, the ledger only matches transfers originating from that specific address. Omit it to match any sender sending the correct token and amount to your wallet.
+
+## List and filter settlements
+
+Retrieve a paginated list of settlements with optional filters. Use the `status` parameter to narrow results, and use `cursor` for page-by-page navigation through large result sets.
+
+```bash
+curl "https://api.your-domain.com/api/v1/settlements?status=PENDING&limit=20" \
+  -H "Authorization: Bearer $IDEM_API_KEY"
+```
+
+Available query parameters:
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `status` | string | Filter by settlement status: `PENDING`, `SETTLED`, `UNMATCHED`, or `CANCELLED`. |
+| `from` | ISO-8601 | Return settlements created on or after this timestamp. |
+| `to` | ISO-8601 | Return settlements created before this timestamp. |
+| `limit` | integer | Number of results per page. Minimum 1, maximum 200, default 50. |
+| `cursor` | string | Opaque pagination cursor returned by the previous response. |
+
+To fetch a single settlement by its ID:
+
+```bash
+curl "https://api.your-domain.com/api/v1/settlements/3fa85f64-5717-4562-b3fc-2c963f66afa6" \
+  -H "Authorization: Bearer $IDEM_API_KEY"
+```
+
+## Cancel a settlement
+
+You can cancel a `PENDING` settlement that you no longer expect to receive. Send a `DELETE` request with the settlement ID:
+
+```bash
+curl -X DELETE "https://api.your-domain.com/api/v1/settlements/3fa85f64-5717-4562-b3fc-2c963f66afa6" \
+  -H "Authorization: Bearer $IDEM_API_KEY"
+```
+
+A successful cancellation returns `200 OK` with the updated settlement record in the response body, showing `status: "CANCELLED"`.
+
+<Warning>
+  Cancellation is irreversible. Once a settlement is cancelled, it cannot be reactivated. If the expected transfer later arrives on-chain, it will not be matched to this record. Register a new settlement expectation if you still want the ledger to track the incoming transfer.
+</Warning>
+
+If the settlement is already in a terminal state (`SETTLED`, `UNMATCHED`, or `CANCELLED`), the API returns `409 Conflict` — you cannot cancel a settlement that has already been resolved.
+
+## Status reference
+
+| Status | Description |
+|--------|-------------|
+| `PENDING` | The expectation has been registered and the ledger is watching for a matching on-chain transfer. This is the only state from which cancellation is possible. |
+| `SETTLED` | A matching on-chain transfer was found. The ledger has committed the corresponding journal entries and linked the transaction to this settlement record. |
+| `UNMATCHED` | The settlement window closed without a matching transfer being detected. Review the on-chain activity and consider re-registering the expectation or triggering batch reconciliation. |
+| `CANCELLED` | The settlement was explicitly cancelled via `DELETE /api/v1/settlements/{id}` before it reached a terminal state. |

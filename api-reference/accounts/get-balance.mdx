@@ -1,0 +1,96 @@
+---
+title: "Get Account Balance — Current or Point in Time Query"
+sidebarTitle: "Get Balance"
+description: "GET /api/v1/accounts/{accountId}/balance — returns the current or historical balance for an account. Pass asOf for point-in-time queries."
+---
+
+Use this endpoint to retrieve the balance of a single ledger account. By default, calling this endpoint returns the account's **current balance** — computed from all posted journal entries up to the moment the request is received. If you need to audit or reconcile historical state, pass the optional `asOf` query parameter with an ISO 8601 datetime to receive the balance as it stood at that exact point in time.
+
+## Endpoint
+
+```
+GET /api/v1/accounts/{accountId}/balance
+```
+
+## Authorization
+
+Requires an API key with the `ACCOUNTS_READ` scope. Pass your key in the `Authorization` header using the Bearer scheme.
+
+```
+Authorization: Bearer <api-key>
+```
+
+## Parameters
+
+<ParamField path="accountId" type="string (UUID)" required>
+  The unique identifier of the account whose balance you want to retrieve. Must be a valid UUID corresponding to an account that exists in your tenant.
+</ParamField>
+
+<ParamField query="asOf" type="string (ISO 8601 datetime)">
+  An optional point-in-time datetime. When supplied, the API returns the balance computed from all entries whose `createdAt` is **on or before** this timestamp. When omitted, the API returns the current balance using all posted entries.
+
+  **Example:** `2024-05-31T23:59:59Z`
+</ParamField>
+
+## Request examples
+
+**Current balance**
+
+```bash
+curl --request GET \
+  --url https://api.your-domain.com/api/v1/accounts/a1b2c3d4-e5f6-7890-abcd-ef1234567890/balance \
+  --header "Authorization: Bearer <api-key>"
+```
+
+**Point-in-time balance**
+
+```bash
+curl --request GET \
+  --url "https://api.your-domain.com/api/v1/accounts/a1b2c3d4-e5f6-7890-abcd-ef1234567890/balance?asOf=2024-05-31T23%3A59%3A59Z" \
+  --header "Authorization: Bearer <api-key>"
+```
+
+<Note>
+  Remember to URL-encode the `asOf` value when constructing the query string manually. The colons (`:`) in an ISO 8601 datetime must be encoded as `%3A`.
+</Note>
+
+## Response
+
+<ResponseField name="accountId" type="string (UUID)" required>
+  The unique identifier of the account, echoed back from the request.
+</ResponseField>
+
+<ResponseField name="currency" type="string" required>
+  The ISO 4217 currency code of the account (e.g. `USD`, `BRL`).
+</ResponseField>
+
+<ResponseField name="balance" type="number" required>
+  The computed balance as a decimal number. The value reflects the net effect of all posted journal entries up to (and including) the `asOf` timestamp, or up to the present moment if `asOf` was omitted.
+</ResponseField>
+
+<ResponseField name="asOf" type="string (ISO 8601)">
+  The effective datetime of the balance. When you passed an `asOf` query parameter, this field echoes that value. When you omitted `asOf`, this field contains the server timestamp at which the balance was computed.
+</ResponseField>
+
+## Response example
+
+```json
+{
+  "accountId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "currency": "USD",
+  "balance": 14825.50,
+  "asOf": "2024-05-31T23:59:59Z"
+}
+```
+
+<Tip>
+  Point-in-time balance queries are fully consistent — the ledger is append-only, so a historical balance will always return the same result regardless of when you request it.
+</Tip>
+
+## Error codes
+
+| Code | Meaning |
+|------|---------|
+| 401  | Missing or invalid API key. |
+| 403  | Your API key does not have the `ACCOUNTS_READ` scope. |
+| 404  | No account with the given `accountId` exists in your tenant. |

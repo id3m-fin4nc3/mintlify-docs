@@ -1,0 +1,84 @@
+---
+title: "Configure Agent Policy Rules to Control Automated Transactions"
+sidebarTitle: "Policy Rules"
+description: "Learn how to create and manage policy rules that control what agent-originated transactions are permitted in the Idem Ledger API."
+---
+
+Policy rules define the boundaries within which automated agents — API keys holding the `AGENTS_EXECUTE` scope — are permitted to operate. Each rule matches on one or more criteria such as agent key prefix, token type, chain, transaction amount, or specific accounts. Rules are evaluated by **PolicyGuard**, a stateless per-tenant evaluator that runs before any agent-originated write. Any transaction that falls outside the active rules is rejected before it reaches the ledger, and the evaluation itself is recorded to the HMAC-signed agent audit log.
+
+## Create a policy rule
+
+Send a `POST` request to `/api/v1/admin/policy-rules` to define a new rule. The example below creates a rule that restricts agents whose keys begin with `sk_live_agent_` to transactions of up to 1 000 USDC or USDT on EVM chains.
+
+```bash
+curl -X POST https://api.your-domain.com/api/v1/admin/policy-rules \
+  -H "Authorization: Bearer $IDEM_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "AGENT_TRANSACTION_LIMIT",
+    "agentKeyPrefix": "sk_live_agent_",
+    "amount": "1000.00",
+    "tokens": ["USDC", "USDT"],
+    "chains": ["EVM"]
+  }'
+```
+
+A successful response returns the created rule including its assigned `id` and `createdAt` timestamp:
+
+```json
+{
+  "id": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+  "type": "AGENT_TRANSACTION_LIMIT",
+  "agentKeyPrefix": "sk_live_agent_",
+  "params": {
+    "amount": "1000.00",
+    "tokens": ["USDC", "USDT"],
+    "chains": ["EVM"]
+  },
+  "createdAt": "2024-03-01T12:00:00Z"
+}
+```
+
+## Rule fields
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `type` | string | **Required.** The rule type identifier, such as `AGENT_TRANSACTION_LIMIT`. This controls how the ledger interprets and enforces the remaining fields. |
+| `agentKeyPrefix` | string | A prefix string matched against the agent's API key. Only agents whose key begins with this value are subject to the rule. Omit to apply the rule to all agents. |
+| `amount` | string | The maximum transaction amount permitted by this rule, expressed as a decimal string (e.g., `"1000.00"`). |
+| `debitAccountId` | UUID | Restricts the rule to transactions that debit this specific account. |
+| `creditAccountId` | UUID | Restricts the rule to transactions that credit this specific account. |
+| `tokens` | string\[\] | A list of permitted token identifiers. Accepted values: `USDC`, `USDT`, `BRZ`, `PYUSD`. |
+| `chains` | string\[\] | A list of permitted chain identifiers. Accepted values: `EVM`, `SOLANA`, `TRON`. |
+
+All fields except `type` are optional. Include only the fields relevant to the constraint you want to enforce — omitting a field generally means that dimension is unconstrained by this rule.
+
+## List policy rules
+
+To view all active policy rules for your tenant, send a `GET` request to `/api/v1/admin/policy-rules`:
+
+```bash
+curl https://api.your-domain.com/api/v1/admin/policy-rules \
+  -H "Authorization: Bearer $IDEM_API_KEY"
+```
+
+The response is an array of `PolicyRuleResponse` objects, each containing the rule `id`, `type`, `agentKeyPrefix`, `params`, and `createdAt`.
+
+## Delete a policy rule
+
+To remove a policy rule, send a `DELETE` request with the rule's ID:
+
+```bash
+curl -X DELETE "https://api.your-domain.com/api/v1/admin/policy-rules/9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d" \
+  -H "Authorization: Bearer $IDEM_API_KEY"
+```
+
+A successful deletion returns `204 No Content` with an empty response body. Deletion takes effect immediately. Any agent transactions submitted after the deletion will no longer be evaluated against the deleted rule. If other rules remain active, those continue to apply.
+
+## Required scope
+
+All policy rule operations — listing, creating, and deleting — require the **ADMIN** scope. This scope should be held only by highly privileged keys used by your platform administrators, not by agent or service account keys.
+
+<Tip>
+  Use `agentKeyPrefix` to scope rules to a specific set of agents without needing a separate rule per key. For example, if you have a group of payment-processing agents whose keys all begin with `sk_live_agent_pay_`, a single rule with `"agentKeyPrefix": "sk_live_agent_pay_"` covers all of them. You can then create a separate, more permissive rule for a different group — such as internal settlement agents with a distinct prefix — without any overlap.
+</Tip>

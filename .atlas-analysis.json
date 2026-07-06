@@ -1,0 +1,135 @@
+{
+  "projectType": "api-service",
+  "projectName": "Idem Ledger API",
+  "projectDescription": "A double-entry ledger API for stablecoin payments, providing account management, transaction posting, settlement tracking, compliance exports, and agent policy controls.",
+  "theme": "luma",
+  "primaryColor": "#ef7025",
+  "lightColor": "#eec9bc",
+  "darkColor": "#4fa1ab",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "authentication",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/double-entry",
+              "concepts/accounts",
+              "concepts/settlements",
+              "concepts/scopes"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/post-transaction",
+              "guides/settlements",
+              "guides/reconciliation",
+              "guides/compliance",
+              "guides/webhooks",
+              "guides/policy-rules"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Accounts",
+            "pages": [
+              "api-reference/accounts/list-accounts",
+              "api-reference/accounts/create-account",
+              "api-reference/accounts/get-balance",
+              "api-reference/accounts/list-entries",
+              "api-reference/accounts/get-statement"
+            ]
+          },
+          {
+            "group": "Transactions",
+            "pages": [
+              "api-reference/transactions/post-transaction"
+            ]
+          },
+          {
+            "group": "Settlements",
+            "pages": [
+              "api-reference/settlements/list-settlements",
+              "api-reference/settlements/register-settlement",
+              "api-reference/settlements/get-settlement",
+              "api-reference/settlements/cancel-settlement"
+            ]
+          },
+          {
+            "group": "Reconciliation",
+            "pages": [
+              "api-reference/reconciliation/batch-reconcile"
+            ]
+          },
+          {
+            "group": "Compliance",
+            "pages": [
+              "api-reference/compliance/audit-export"
+            ]
+          },
+          {
+            "group": "Administration",
+            "pages": [
+              "api-reference/admin/list-api-keys",
+              "api-reference/admin/create-api-key",
+              "api-reference/admin/revoke-api-key",
+              "api-reference/admin/list-policy-rules",
+              "api-reference/admin/create-policy-rule",
+              "api-reference/admin/delete-policy-rule",
+              "api-reference/admin/get-webhook",
+              "api-reference/admin/update-webhook"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Double-entry ledger with strict debit/credit balance enforcement",
+    "Stablecoin settlement tracking (USDC, USDT, BRZ, PYUSD) across EVM, Solana, and Tron",
+    "Fiat and on-chain journal entries with multi-currency support (USD, BRL, MXN, EUR)",
+    "Idempotent transaction posting with client-supplied keys",
+    "Agent policy rules for controlling automated transaction permissions",
+    "Compliance audit log export in NDJSON format",
+    "Webhook notifications for tenant events",
+    "Fine-grained API key scopes for least-privilege access control",
+    "Account statements with opening/closing balances and movements",
+    "Manual batch reconciliation for unmatched transactions"
+  ],
+  "publicApiSurface": [
+    "POST /api/v1/transactions",
+    "GET /api/v1/accounts",
+    "POST /api/v1/accounts",
+    "GET /api/v1/accounts/{accountId}/balance",
+    "GET /api/v1/accounts/{accountId}/entries",
+    "GET /api/v1/accounts/{accountId}/statement",
+    "GET /api/v1/settlements",
+    "POST /api/v1/settlements",
+    "GET /api/v1/settlements/{id}",
+    "DELETE /api/v1/settlements/{id}",
+    "POST /api/v1/reconciliation/batch",
+    "GET /api/v1/compliance/audit-export",
+    "GET /api/v1/api-keys",
+    "POST /api/v1/api-keys",
+    "DELETE /api/v1/api-keys/{keyId}",
+    "GET /api/v1/admin/policy-rules",
+    "POST /api/v1/admin/policy-rules",
+    "DELETE /api/v1/admin/policy-rules/{ruleId}",
+    "GET /api/v1/tenant/webhook",
+    "PUT /api/v1/tenant/webhook"
+  ]
+}

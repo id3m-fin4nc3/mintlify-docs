@@ -1,0 +1,99 @@
+---
+title: "List Settlements with Filtering and Pagination"
+sidebarTitle: "List Settlements"
+description: "GET /api/v1/settlements — lists settlements filtered by status and date range with cursor pagination. Statuses: PENDING, SETTLED, UNMATCHED, CANCELLED."
+---
+
+Use this endpoint to retrieve all settlement expectations for your tenant. Filter by status to monitor pending transfers, identify unmatched settlements, or audit completed ones. Results are paginated and returned in reverse-chronological order.
+
+## Endpoint
+
+```
+GET /api/v1/settlements
+```
+
+## Authorization
+
+Requires an API key with the `TRANSACTIONS_READ` scope.
+
+## Query Parameters
+
+<ParamField query="status" type="string">
+  Filter results by settlement status. One of: `PENDING`, `SETTLED`, `UNMATCHED`, `CANCELLED`.
+</ParamField>
+
+<ParamField query="from" type="string">
+  Inclusive lower bound on `createdAt`. ISO-8601 datetime (e.g. `2024-01-01T00:00:00Z`).
+</ParamField>
+
+<ParamField query="to" type="string">
+  Inclusive upper bound on `createdAt`. ISO-8601 datetime.
+</ParamField>
+
+<ParamField query="limit" type="integer">
+  Maximum results per page. Range 1–200. Default: `50`.
+</ParamField>
+
+<ParamField query="cursor" type="string">
+  Opaque pagination cursor returned as `nextCursor` in the previous page's response. Omit to start from the first page.
+</ParamField>
+
+## Request Example
+
+```bash
+# List all PENDING settlements
+curl "https://api.your-domain.com/api/v1/settlements?status=PENDING&limit=20" \
+  -H "Authorization: Bearer $IDEM_API_KEY"
+
+# Paginate to the next page
+curl "https://api.your-domain.com/api/v1/settlements?status=PENDING&limit=20&cursor=eyJpZCI6IjEyMyJ9" \
+  -H "Authorization: Bearer $IDEM_API_KEY"
+```
+
+## Response
+
+<ResponseField name="items" type="array">
+  Array of settlement objects for this page.
+  <Expandable title="Settlement object fields">
+    <ResponseField name="id" type="string">Settlement UUID.</ResponseField>
+    <ResponseField name="accountId" type="string">UUID of the receiving account.</ResponseField>
+    <ResponseField name="expectedToken" type="string">Expected stablecoin token.</ResponseField>
+    <ResponseField name="expectedAmount" type="string">Expected transfer amount.</ResponseField>
+    <ResponseField name="expectedWalletAddress" type="string">Watched wallet address.</ResponseField>
+    <ResponseField name="expectedChainId" type="string">Chain being watched.</ResponseField>
+    <ResponseField name="status" type="string">`PENDING`, `SETTLED`, `UNMATCHED`, or `CANCELLED`.</ResponseField>
+    <ResponseField name="createdAt" type="string">ISO-8601 creation timestamp.</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="nextCursor" type="string">
+  Pass this value as the `cursor` query parameter to retrieve the next page. `null` when there are no more results.
+</ResponseField>
+
+## Response Example
+
+```json
+{
+  "items": [
+    {
+      "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "accountId": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+      "expectedToken": "USDC",
+      "expectedAmount": "100.00",
+      "expectedWalletAddress": "0xYourWallet...",
+      "expectedChainId": "EVM",
+      "status": "PENDING",
+      "createdAt": "2024-01-15T09:00:00Z"
+    }
+  ],
+  "nextCursor": null
+}
+```
+
+## Error Codes
+
+| Code | Meaning |
+|------|-----------------------------------------------------------|
+| 400  | Invalid `status` value, invalid date range, or malformed cursor |
+| 401  | Missing or invalid API key |
+| 403  | API key does not have `TRANSACTIONS_READ` scope |

@@ -1,0 +1,100 @@
+---
+title: "Idem Ledger Accounts: Types, Currencies, and Balances"
+sidebarTitle: "Accounts"
+description: "Understand the Idem Ledger account model. Accounts hold balances in a single currency and can be ASSET, LIABILITY, EQUITY, REVENUE, or EXPENSE type."
+---
+
+Accounts are the fundamental building blocks of the Idem Ledger. Every journal line in a transaction targets an account, and each account accumulates a running balance from those entries over time. When you design your ledger structure, you create a chart of accounts that mirrors the economic reality of your payment flows — wallets you hold, liabilities you owe customers, revenue you earn, and costs you incur.
+
+## Account types
+
+Idem follows the standard five-type accounting taxonomy. Every account you create must be assigned one of the following types, which determines how its balance is interpreted.
+
+| Type | Typical use |
+|---|---|
+| `ASSET` | Wallets, custodial pools, bank accounts you hold |
+| `LIABILITY` | Customer deposits, amounts owed to others |
+| `EQUITY` | Capital, retained earnings |
+| `REVENUE` | Income, fees earned |
+| `EXPENSE` | Costs, fees paid |
+
+Choosing the right type matters for balance reporting and reconciliation: asset and expense accounts have a natural debit balance, while liability, equity, and revenue accounts have a natural credit balance.
+
+## Supported currencies
+
+Each account holds a balance in exactly **one** currency. You cannot mix currencies within a single account. Idem supports the following ISO 4217 fiat currencies:
+
+| Currency code | Currency |
+|---|---|
+| `BRL` | Brazilian Real |
+| `USD` | US Dollar |
+| `MXN` | Mexican Peso |
+| `EUR` | Euro |
+
+If your operation handles multiple currencies, create one account per currency per role in your chart of accounts (for example, a `USD` ASSET account for your USDC pool and a `BRL` ASSET account for your PIX settlement account).
+
+## Creating an account
+
+Send a `POST` request to `/api/v1/accounts` with a name, an optional description, a currency, and a type. Account names must be unique within your tenant.
+
+**Request**
+
+```json
+POST /api/v1/accounts
+{
+  "name": "USDC Wallet",
+  "description": "Primary USDC custodial wallet",
+  "currency": "USD",
+  "type": "ASSET"
+}
+```
+
+**Response — 201 Created**
+
+```json
+{
+  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "name": "USDC Wallet",
+  "currency": "USD",
+  "type": "ASSET",
+  "createdAt": "2024-01-15T10:00:00Z"
+}
+```
+
+Store the returned `id` — you will reference it as `accountId` in every journal line that targets this account.
+
+## Querying balances
+
+Retrieve the current balance of any account with a `GET` request:
+
+```bash
+GET /api/v1/accounts/{accountId}/balance
+```
+
+For point-in-time balance queries, pass an `asOf` timestamp as a query parameter. The ledger replays all entries up to that instant and returns the balance as it stood at that moment — useful for end-of-day reporting, audits, or debugging a historical discrepancy.
+
+```bash
+GET /api/v1/accounts/{accountId}/balance?asOf=2024-01-15T23:59:59Z
+```
+
+The response includes the `balance`, `currency`, and the `asOf` timestamp used for the calculation (which defaults to `now` if you omit the parameter).
+
+## Account statements
+
+For a complete view of all movements in an account over a time window, use the statement endpoint:
+
+```bash
+GET /api/v1/accounts/{accountId}/statement?from=2024-01-01T00:00:00Z&to=2024-01-31T23:59:59Z
+```
+
+The response includes:
+
+| Field | Description |
+|---|---|
+| `openingBalance` | Balance at the start of the requested window |
+| `movements` | Ordered list of every journal entry in the period |
+| `closingBalance` | Balance at the end of the requested window |
+
+<Note>
+Both `from` and `to` are required and must be valid ISO 8601 timestamps. For large accounts with many entries, use narrow time windows to keep response sizes manageable.
+</Note>

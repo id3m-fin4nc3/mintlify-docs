@@ -1,0 +1,111 @@
+---
+title: "Create an Agent Policy Rule to Restrict Transactions"
+sidebarTitle: "Create Policy Rule"
+description: "POST /api/v1/admin/policy-rules — create a policy rule to restrict agent-originated transactions. Scope by key prefix, token, chain, or amount limit."
+---
+
+Use this endpoint to define a new policy rule for your tenant. Policy rules act as guardrails for agent-originated transactions — you can restrict the maximum transaction amount, limit which tokens or chains an agent may interact with, or lock an agent to specific debit and credit accounts. Rules can be scoped to a subset of agents using a key prefix, giving you fine-grained control over each agent's permissions.
+
+## Endpoint
+
+```
+POST /api/v1/admin/policy-rules
+```
+
+## Authorization
+
+Requires an API key with `ADMIN` scope.
+
+## Request Body
+
+<ParamField body="type" type="string" required>
+  The rule type that determines how this policy is evaluated. Examples include `MAX_AMOUNT`, `ALLOWED_TOKENS`, and `ALLOWED_CHAINS`. Contact your Idem representative for the full list of supported rule types and their required fields.
+</ParamField>
+
+<ParamField body="agentKeyPrefix" type="string">
+  An optional string prefix used to scope this rule to a specific agent or group of agents. Only API keys whose identifier starts with this prefix will be subject to the rule. If omitted, the rule applies to all agents.
+</ParamField>
+
+<ParamField body="amount" type="string">
+  The maximum transaction amount permitted under this rule. Used with rule types that enforce numeric limits (for example, `MAX_AMOUNT`). Provide as a decimal string (for example, `"5000.00"`).
+</ParamField>
+
+<ParamField body="debitAccountId" type="string">
+  Restricts the rule to transactions that debit a specific account. Provide the account's UUID.
+</ParamField>
+
+<ParamField body="creditAccountId" type="string">
+  Restricts the rule to transactions that credit a specific account. Provide the account's UUID.
+</ParamField>
+
+<ParamField body="tokens" type="string[]">
+  An optional list of token identifiers (for example, `["USDC", "ETH"]`) that this rule permits or restricts, depending on the rule type.
+</ParamField>
+
+<ParamField body="chains" type="string[]">
+  An optional list of chain identifiers (for example, `["ethereum", "polygon"]`) that this rule permits or restricts, depending on the rule type.
+</ParamField>
+
+## Request Example
+
+The following example creates a `MAX_AMOUNT` rule that limits any agent with the `agent_payments_` key prefix to transactions no greater than `5000.00`.
+
+```bash
+curl --request POST \
+  --url https://api.your-domain.com/api/v1/admin/policy-rules \
+  --header 'Authorization: Bearer <api-key>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "type": "MAX_AMOUNT",
+    "agentKeyPrefix": "agent_payments_",
+    "amount": "5000.00"
+  }'
+```
+
+## Response
+
+<ResponseField name="id" type="string" required>
+  Unique identifier (UUID) for the newly created policy rule.
+</ResponseField>
+
+<ResponseField name="type" type="string" required>
+  The rule type as provided in the request.
+</ResponseField>
+
+<ResponseField name="agentKeyPrefix" type="string">
+  The agent key prefix the rule is scoped to, if provided.
+</ResponseField>
+
+<ResponseField name="params" type="object" required>
+  The resolved parameters object constructed from the fields you supplied (for example, `amount`, `tokens`, `chains`).
+</ResponseField>
+
+<ResponseField name="createdAt" type="string (datetime)" required>
+  ISO 8601 timestamp of when the rule was created.
+</ResponseField>
+
+## Response Example
+
+```json
+{
+  "id": "3f5a7c91-12bc-4d8e-a6f0-9b2e1d4c7a88",
+  "type": "MAX_AMOUNT",
+  "agentKeyPrefix": "agent_payments_",
+  "params": {
+    "amount": "5000.00"
+  },
+  "createdAt": "2024-12-01T11:00:00Z"
+}
+```
+
+<Tip>
+  Start with a narrow `agentKeyPrefix` and a conservative `amount` limit when onboarding a new agent. You can delete and recreate rules as your agent's requirements become clearer.
+</Tip>
+
+## Error Codes
+
+| Code | Meaning |
+|---|---|
+| `400` | Invalid rule `type`, unrecognized field values, or missing required fields for the given rule type. |
+| `401` | Missing or invalid API key. |
+| `403` | The provided API key does not have `ADMIN` scope. |

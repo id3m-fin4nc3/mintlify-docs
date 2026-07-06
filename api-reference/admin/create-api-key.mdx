@@ -1,0 +1,99 @@
+---
+title: "Create a Scoped API Key with Least-Privilege Permissions"
+sidebarTitle: "Create API Key"
+description: "POST /api/v1/api-keys — creates a new API key with specified scopes. The raw key is shown only once in the response. Store it immediately and securely."
+---
+
+Use this endpoint to issue a new API key for your tenant. You define the exact set of permission scopes the key will carry, following the principle of least privilege — only grant the scopes a consumer actually needs. The raw key is included in the creation response exactly once and cannot be retrieved again. If the key is lost, you must revoke it and create a replacement.
+
+## Endpoint
+
+```
+POST /api/v1/api-keys
+```
+
+## Authorization
+
+Requires an API key with `ADMIN` scope.
+
+<Warning>
+  The raw API key is returned **only once** in the `201` response. Copy it to a secure secret store (such as a secrets manager or vault) immediately. There is no way to recover the raw value after this response.
+</Warning>
+
+## Request Body
+
+<ParamField body="scopes" type="string[]" required>
+  One or more permission scopes to assign to the new key. Must contain at least one entry; all values must be unique. See the table below for all valid scopes.
+</ParamField>
+
+### Available Scopes
+
+| Scope | Purpose |
+|---|---|
+| `TRANSACTIONS_READ` | Read transaction records. |
+| `TRANSACTIONS_WRITE` | Create and submit transactions. |
+| `ACCOUNTS_READ` | Read account details and balances. |
+| `ACCOUNTS_WRITE` | Create and modify accounts. |
+| `AGENTS_EXECUTE` | Submit agent-originated transactions. |
+| `AGENTS_ROLLBACK` | Trigger rollback of agent transactions. |
+| `AGENTS_AUDIT_READ` | Read agent audit logs. |
+| `RECONCILIATION_READ` | Read reconciliation reports. |
+| `RECONCILIATION_WRITE` | Create and manage reconciliation runs. |
+| `COMPLIANCE_EXPORT` | Export compliance and audit data. |
+| `WEBHOOK_MANAGE` | Register and update tenant webhook configuration. |
+| `ADMIN` | Full administrative access, including key and policy management. |
+
+## Request Example
+
+The following example creates a payment-processor key that can write transactions and read account information.
+
+```bash
+curl --request POST \
+  --url https://api.your-domain.com/api/v1/api-keys \
+  --header 'Authorization: Bearer <api-key>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "scopes": ["TRANSACTIONS_WRITE", "ACCOUNTS_READ"]
+  }'
+```
+
+## Response
+
+<ResponseField name="id" type="string" required>
+  Unique identifier (UUID) for the newly created API key.
+</ResponseField>
+
+<ResponseField name="key" type="string" required>
+  The raw API key value. **Shown only once.** Store this value immediately.
+</ResponseField>
+
+<ResponseField name="scopes" type="string[]" required>
+  The permission scopes assigned to the key, as provided in the request.
+</ResponseField>
+
+<ResponseField name="createdAt" type="string (datetime)" required>
+  ISO 8601 timestamp of when the key was created.
+</ResponseField>
+
+## Response Example
+
+```json
+{
+  "id": "c7d8e9f0-1a2b-3c4d-5e6f-7a8b9c0d1e2f",
+  "key": "idem_live_sk_4xQzP9mNvRtYwKjLhBcUeOsD3aFgHiTn",
+  "scopes": ["TRANSACTIONS_WRITE", "ACCOUNTS_READ"],
+  "createdAt": "2024-12-01T10:15:00Z"
+}
+```
+
+<Tip>
+  Scope keys narrowly. A service that only reads transactions does not need `ADMIN` or `ACCOUNTS_WRITE`. Narrow scopes limit the blast radius if a key is ever compromised.
+</Tip>
+
+## Error Codes
+
+| Code | Meaning |
+|---|---|
+| `400` | Validation error — `scopes` is empty, contains duplicates, or includes an unrecognized scope value. |
+| `401` | Missing or invalid API key. |
+| `403` | The provided API key does not have `ADMIN` scope. |

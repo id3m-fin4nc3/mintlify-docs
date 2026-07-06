@@ -1,0 +1,126 @@
+---
+title: "Double-Entry Bookkeeping and Balanced Transactions"
+sidebarTitle: "Double-Entry"
+description: "Learn how the Idem Ledger enforces double-entry bookkeeping. Every transaction must have balanced debits and credits per currency across all journal lines."
+---
+
+Every transaction you post to the Idem Ledger must be balanced: the sum of all debit amounts must equal the sum of all credit amounts for each currency represented in the transaction. This invariant is enforced at write time — if your lines do not balance, the API returns a `422 Unprocessable Entity` error and the transaction is not recorded.
+
+## The journal line model
+
+A transaction is made up of two or more **journal lines**, each described by a `JournalLineRequestDto`. A single transaction can contain between 2 and 1,000 lines, enabling complex multi-leg entries in a single atomic operation.
+
+Each journal line carries three required fields:
+
+| Field | Description |
+|---|---|
+| `accountId` | The UUID of the account this line targets |
+| `entryType` | Either `DEBIT` or `CREDIT` |
+| `monetaryEntry` | The value moved — either a fiat entry or an on-chain entry |
+
+An optional `description` field lets you annotate individual lines with human-readable context (for example, `"Customer deposit — order #1042"`).
+
+## Fiat vs. on-chain entries
+
+Every journal line carries exactly one monetary entry. Idem supports two entry shapes depending on whether the underlying value movement happened on a traditional payment rail or on a blockchain.
+
+| Field | FiatEntryDto | OnChainEntryDto |
+|---|---|---|
+| `amount` | ✓ | ✓ |
+| `currency` | `BRL`, `USD`, `MXN`, `EUR` | — |
+| `token` | — | `USDC`, `USDT`, `BRZ`, `PYUSD` |
+| `rail` | `ACH`, `WIRE`, `PIX`, `SWIFT`, `SEPA` | — |
+| `chainId` | — | `EVM`, `SOLANA`, `TRON` |
+| `bankReference` | Optional — your bank's reference string | — |
+| `txHash` | — | On-chain transaction hash |
+| `blockNumber` | — | Block in which the transaction was confirmed |
+| `walletAddress` | — | Receiving wallet address |
+| `tokenContract` | — | Smart contract address of the token |
+
+Use `FiatEntryDto` when the movement was settled over a bank or payment network. Use `OnChainEntryDto` when you are recording a confirmed stablecoin transfer and need the full on-chain provenance stored in your ledger.
+
+## Balanced transaction example
+
+The following example records a 100 USDC receipt: the inflow is debited to your custodial wallet (an asset account) and credited to a customer deposits account (a liability account). Both lines are in the same token, so the transaction balances.
+
+```json
+POST /api/v1/transactions
+{
+  "lines": [
+    {
+      "accountId": "11111111-1111-1111-1111-111111111111",
+      "entryType": "DEBIT",
+      "monetaryEntry": {
+        "type": "ONCHAIN",
+        "amount": 100.00,
+        "token": "USDC",
+        "chainId": "EVM",
+        "txHash": "0xabc123...",
+        "blockNumber": 19000000,
+        "walletAddress": "0xYourCustodialWallet...",
+        "tokenContract": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+      },
+      "description": "USDC inflow — custodial wallet"
+    },
+    {
+      "accountId": "22222222-2222-2222-2222-222222222222",
+      "entryType": "CREDIT",
+      "monetaryEntry": {
+        "type": "ONCHAIN",
+        "amount": 100.00,
+        "token": "USDC",
+        "chainId": "EVM",
+        "txHash": "0xabc123...",
+        "blockNumber": 19000000,
+        "walletAddress": "0xYourCustodialWallet...",
+        "tokenContract": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+      },
+      "description": "Customer deposit liability — account #4021"
+    }
+  ],
+  "metadata": {
+    "customerId": "cust_4021",
+    "orderId": "ord_98765"
+  }
+}
+```
+
+Total debits: **100.00 USDC** — Total credits: **100.00 USDC** ✓
+
+## The metadata field
+
+Every transaction **requires** a `metadata` field: a free-form map of string keys to string values. Metadata is stored alongside the transaction and returned in all read responses. Use it to attach your own identifiers — customer IDs, order numbers, external reference codes — without changing your account structure.
+
+```json
+"metadata": {
+  "customerId": "cust_4021",
+  "orderId": "ord_98765",
+  "region": "latam"
+}
+```
+
+Metadata is for your reference only. Idem does not act on metadata values, and there is no enforced schema — you can add any keys that make sense for your integration.
+
+## Idempotency
+
+All transaction write endpoints require an `Idempotency-Key` request header. Supply a unique key with every request so that retries are safe.
+
+- **New key, no prior request:** the transaction is processed normally and returns `201 Created`.
+- **Same key, request still in progress:** the API returns `409 Conflict` while the original is being processed. Retry after a brief back-off.
+- **Same key, prior request succeeded:** the API returns the original `201 Created` response without creating a duplicate transaction.
+
+```bash
+POST /api/v1/transactions
+Idempotency-Key: ord_98765-attempt-1
+Content-Type: application/json
+```
+
+Key constraints:
+
+- Maximum length: **255 characters**
+- Must be unique per logical transaction within your tenant
+- A key used for one transaction must not be reused for a different transaction
+
+<Warning>
+If your journal lines do not balance — that is, the total debit amount does not equal the total credit amount for every currency in the transaction — the API returns `422 Unprocessable Entity` and the transaction is rejected in its entirety. No partial writes occur. Check that each currency represented in your lines sums to zero across debits and credits before submitting.
+</Warning>
